@@ -2,25 +2,10 @@
  * supabase-config.js
  *
  * Initialises the shared Supabase client used by every page.
- * Replace the two placeholder values with your actual project credentials
- * from Supabase Dashboard → Settings → API.
- *
- * IMPORTANT: only the anon (public) key should ever be present in this file.
- * Never put the service-role key in any frontend code.
  */
 
-const SUPABASE_URL = 'https://your-project-ref.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key-here';
-
-if (
-  SUPABASE_URL === 'https://your-project-ref.supabase.co' ||
-  SUPABASE_ANON_KEY === 'your-anon-key-here'
-) {
-  console.warn(
-    '[Art Portfolio] Supabase credentials are still set to placeholder values. ' +
-    'Update SUPABASE_URL and SUPABASE_ANON_KEY in js/supabase-config.js before deploying.',
-  );
-}
+const SUPABASE_URL = 'https://mmiluhqhiyxqmceexcpw.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1taWx1aHFoaXl4cW1jZWV4Y3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDQ3MjYsImV4cCI6MjA5ODA4MDcyNn0.peueizWg91WWpiKt6GhxLwkQoreXRULeex_jI8ILqQY';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {

@@ -6,9 +6,8 @@
  */
 
 // ── Contact info ─────────────────────────────────────────────────────────────
-// Replace with your actual contact details.
-const CONTACT_EMAIL = 'hello@example.com';
-const CONTACT_INSTAGRAM = 'https://www.instagram.com/yourhandle';
+const CONTACT_EMAIL = 'asubichev@gmail.com';
+const CONTACT_INSTAGRAM = 'https://www.instagram.com/asubichev';
 
 // ─────────────────────────────────────────────────────────────────────────────
 

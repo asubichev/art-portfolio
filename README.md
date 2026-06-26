@@ -37,9 +37,6 @@ art-portfolio/
 │   ├── gallery.js           # Public gallery logic
 │   ├── artwork.js           # Artwork detail logic
 │   └── admin.js             # Admin panel logic
-└── sql/
-    ├── schema.sql           # Postgres tables + RLS policies
-    └── storage-policies.sql # Storage bucket RLS policies
 ```
 
 ## Setup
