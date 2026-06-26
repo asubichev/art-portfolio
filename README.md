@@ -39,14 +39,6 @@ art-portfolio/
 │   └── admin.js             # Admin panel logic
 ```
 
-## Setup
-
-1. Push this repository to GitHub.
-2. In **Settings → Pages**, set the source to the `main` branch, root directory.
-3. Your site will be live at `https://<username>.github.io/<repo>/`.
-
-## Image upload policy
-
 All image processing happens in the browser before upload:
 
 - Longest edge resized to **2000 px** (thumbnail: **500 px**)
@@ -54,14 +46,3 @@ All image processing happens in the browser before upload:
 - Quality **0.8**
 - EXIF metadata stripped automatically by the Canvas API
 - Originals are **never** uploaded or stored
-
-## Scaling
-
-When you're ready to add more admins:
-
-```sql
-UPDATE profiles SET role = 'admin' WHERE user_id = '<new-admin-uuid>';
-```
-
-The schema already supports `'editor'` and `'admin'` roles via the `profiles.role` column.
-
