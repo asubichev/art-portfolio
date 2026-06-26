@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin — Art Portfolio</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/admin.css" />
+  </head>
+  <body>
+    <header class="admin-header">
+      <div class="admin-header-left">
+        <span class="admin-logo">Portfolio</span>
+        <span class="admin-badge">Admin</span>
+      </div>
+      <div class="admin-header-right" id="header-user-area" hidden>
+        <span id="user-email"></span>
+        <button id="logout-btn" class="btn btn-secondary btn-sm">Sign out</button>
+        <a href="index.html" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">View site</a>
+      </div>
+    </header>
+
+    <!-- ── Login ──────────────────────────────────────────────────────────── -->
+    <section id="login-section">
+      <h1>Sign in</h1>
+      <form id="login-form" novalidate>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" for="login-email">Email</label>
+          <input id="login-email" type="email" class="input" autocomplete="email" required />
+        </div>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label" for="login-password">Password</label>
+          <input id="login-password" type="password" class="input" autocomplete="current-password" required />
+        </div>
+        <button id="login-btn" type="submit" class="btn btn-primary" style="width: 100%;">Sign in</button>
+        <p id="login-error" aria-live="assertive"></p>
+      </form>
+    </section>
+
+    <!-- ── Dashboard ──────────────────────────────────────────────────────── -->
+    <div id="dashboard-section" hidden>
+
+      <!-- Upload Panel -->
+      <div class="upload-panel">
+        <h2 class="panel-title">Upload artwork</h2>
+
+        <form id="upload-form" novalidate>
+
+          <!-- File drop zone -->
+          <div class="upload-dropzone">
+            <label>
+              <span class="upload-icon">🖼️</span>
+              <span>Click or drag images here</span>
+              <span class="upload-hint">JPEG, PNG, WebP — multiple files supported</span>
+              <input
+                id="upload-files"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+              />
+            </label>
+          </div>
+
+          <!-- Per-file preview + inline title/medium/year -->
+          <div id="upload-preview"></div>
+
+          <hr class="divider" />
+
+          <!-- Default / shared metadata -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" for="upload-title">
+              Title <small>(used for single upload; overridden per-file in bulk)</small>
+            </label>
+            <input id="upload-title" type="text" class="input" placeholder="Untitled" />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" for="upload-description">Description</label>
+            <textarea id="upload-description" class="textarea" rows="3" placeholder="Optional description…"></textarea>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 16px;">
+            <div class="form-group">
+              <label class="form-label" for="upload-medium">Medium</label>
+              <input id="upload-medium" type="text" class="input" placeholder="e.g. Oil on canvas" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="upload-material">Material</label>
+              <input id="upload-material" type="text" class="input" placeholder="e.g. Linen" />
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 16px;">
+            <div class="form-group">
+              <label class="form-label" for="upload-dimensions">Dimensions</label>
+              <input id="upload-dimensions" type="text" class="input" placeholder="e.g. 60 × 80 cm" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="upload-year">Year</label>
+              <input id="upload-year" type="number" class="input" placeholder="2024" min="1800" max="2100" />
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 16px;">
+            <div class="form-group">
+              <label class="form-label" for="upload-price">Price (USD)</label>
+              <input id="upload-price" type="number" class="input" placeholder="Leave blank if NFS" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="upload-status">Initial status</label>
+              <select id="upload-status" class="select">
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-check" style="margin-bottom: 16px;">
+            <input id="upload-available" type="checkbox" checked />
+            <label for="upload-available" class="form-label" style="margin: 0;">Available for sale</label>
+          </div>
+
+          <hr class="divider" />
+          <p class="form-label" style="margin-bottom: 12px;">Prints (optional)</p>
+
+          <div class="form-row-3" style="margin-bottom: 16px;">
+            <div class="form-group">
+              <label class="form-label" for="upload-prints-type">Prints type</label>
+              <select id="upload-prints-type" class="select">
+                <option value="none">None</option>
+                <option value="open">Open edition</option>
+                <option value="limited">Limited edition</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="upload-print-qty">Edition quantity</label>
+              <input id="upload-print-qty" type="number" class="input" placeholder="e.g. 50" min="1" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="upload-print-price">Print price (USD)</label>
+              <input id="upload-print-price" type="number" class="input" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label class="form-label" for="upload-print-size">Print size</label>
+            <input id="upload-print-size" type="text" class="input" placeholder="e.g. A3, 30×40 cm" />
+          </div>
+
+          <hr class="divider" />
+
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label class="form-label" for="upload-seo-keywords">SEO keywords <small>(comma-separated)</small></label>
+            <input id="upload-seo-keywords" type="text" class="input" placeholder="painting, abstract, blue" />
+          </div>
+
+          <!-- Progress -->
+          <div id="upload-progress" hidden>
+            <p id="upload-progress-text"></p>
+            <div class="progress-track">
+              <div id="upload-progress-bar"></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; display: flex; gap: 12px; align-items: center;">
+            <button id="upload-btn" type="submit" class="btn btn-primary">Upload</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Artworks list -->
+      <div class="artworks-panel">
+        <div class="artworks-panel-header">
+          <h2 class="panel-title" style="margin: 0;">All artworks</h2>
+          <button id="refresh-btn" class="btn btn-secondary btn-sm">Refresh</button>
+        </div>
+        <div id="artworks-list"></div>
+      </div>
+    </div>
+
+    <!-- ── Edit Modal ─────────────────────────────────────────────────────── -->
+    <div id="edit-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 id="edit-modal-title" class="modal-title">Edit artwork</h3>
+          <button id="edit-modal-close" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <form id="edit-form" novalidate>
+          <input type="hidden" id="edit-id" />
+          <div class="modal-body">
+
+            <div class="form-group">
+              <label class="form-label" for="edit-title">Title *</label>
+              <input id="edit-title" type="text" class="input" required />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-description">Description</label>
+              <textarea id="edit-description" class="textarea" rows="3"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-medium">Medium</label>
+                <input id="edit-medium" type="text" class="input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-material">Material</label>
+                <input id="edit-material" type="text" class="input" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-dimensions">Dimensions</label>
+                <input id="edit-dimensions" type="text" class="input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-year">Year</label>
+                <input id="edit-year" type="number" class="input" min="1800" max="2100" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-price">Price (USD)</label>
+                <input id="edit-price" type="number" class="input" min="0" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-status">Status</label>
+                <select id="edit-status" class="select">
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-check">
+              <input id="edit-available" type="checkbox" />
+              <label for="edit-available" class="form-label" style="margin: 0;">Available for sale</label>
+            </div>
+
+            <hr class="divider" />
+            <p class="form-label">Prints</p>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label class="form-label" for="edit-prints-type">Type</label>
+                <select id="edit-prints-type" class="select">
+                  <option value="none">None</option>
+                  <option value="open">Open edition</option>
+                  <option value="limited">Limited edition</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-print-qty">Qty</label>
+                <input id="edit-print-qty" type="number" class="input" min="1" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-print-price">Print price</label>
+                <input id="edit-print-price" type="number" class="input" min="0" step="0.01" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-print-size">Print size</label>
+              <input id="edit-print-size" type="text" class="input" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-seo-keywords">SEO keywords <small>(comma-separated)</small></label>
+              <input id="edit-seo-keywords" type="text" class="input" />
+            </div>
+
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="edit-cancel-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/image-processor.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+      // Show header user area once auth state is resolved
+      document.addEventListener('DOMContentLoaded', () => {
+        supabase.auth.onAuthStateChange((_event, session) => {
+          const area = document.getElementById('header-user-area');
+          if (area) area.hidden = !session;
+        });
+
+        // Refresh button
+        document.getElementById('refresh-btn')?.addEventListener('click', loadArtworks);
+
+        // Edit cancel button
+        document.getElementById('edit-cancel-btn')?.addEventListener('click', () => {
+          document.getElementById('edit-modal').hidden = true;
+        });
+      });
+    </script>
+  </body>
+</html>
