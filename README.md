@@ -44,47 +44,6 @@ art-portfolio/
 
 ## Setup
 
-### 1. Supabase project
-
-1. Create a free project at [supabase.com](https://supabase.com).
-2. In **SQL Editor**, run `sql/schema.sql` to create tables and RLS policies.
-3. In **Storage → New bucket**, create a bucket named `artworks` with **Public** set to `true`.
-4. In **SQL Editor**, run `sql/storage-policies.sql` to configure storage RLS.
-
-### 2. Configure credentials
-
-Open `js/supabase-config.js` and replace the two placeholder values:
-
-```js
-const SUPABASE_URL = 'https://your-project-ref.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key-here';
-```
-
-Both values are available in **Supabase Dashboard → Settings → API**.
-
-> **Important:** only use the `anon` (public) key in the frontend. Never put the `service_role` key in any file that ships to users.
-
-### 3. Configure contact links
-
-In `js/artwork.js`, update the two constants near the top of the file:
-
-```js
-const CONTACT_EMAIL = 'hello@example.com';
-const CONTACT_INSTAGRAM = 'https://www.instagram.com/yourhandle';
-```
-
-Also update the `mailto:` href in `index.html` and `artwork.html`.
-
-### 4. Create your first admin user
-
-1. In **Supabase Dashboard → Authentication → Users**, invite or create a user.
-2. In **SQL Editor**, update that user's role to `admin`:
-   ```sql
-   UPDATE profiles SET role = 'admin' WHERE user_id = '<your-user-uuid>';
-   ```
-
-### 5. Deploy to GitHub Pages
-
 1. Push this repository to GitHub.
 2. In **Settings → Pages**, set the source to the `main` branch, root directory.
 3. Your site will be live at `https://<username>.github.io/<repo>/`.
