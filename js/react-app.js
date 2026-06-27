@@ -3,7 +3,25 @@ import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
 import htm from 'https://esm.sh/htm@3.1.1';
 
 const html = htm.bind(React.createElement);
-const supabase = window.supabaseClient;
+const SUPABASE_URL = 'https://mmiluhqhiyxqmceexcpw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1taWx1aHFoaXl4cW1jZWV4Y3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDQ3MjYsImV4cCI6MjA5ODA4MDcyNn0.peueizWg91WWpiKt6GhxLwkQoreXRULeex_jI8ILqQY';
+
+function getSupabaseClient() {
+  const existing = window.supabaseClient;
+  if (existing?.from && existing?.auth) return existing;
+
+  const supabaseLib = window.supabase;
+  if (!supabaseLib?.createClient) return null;
+
+  window.supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
+
+  return window.supabaseClient;
+}
 
 function getHashRoute() {
   const hash = window.location.hash || '#/gallery';
@@ -40,12 +58,13 @@ function App() {
     let mounted = true;
 
     async function bootstrap() {
-      if (!supabase?.auth) {
+      const sb = getSupabaseClient();
+      if (!sb?.auth) {
         setAuthReady(true);
         return;
       }
 
-      const { data } = await supabase.auth.getSession();
+      const { data } = await sb.auth.getSession();
       if (!mounted) return;
       const sess = data?.session ?? null;
       setSession(sess);
@@ -57,13 +76,14 @@ function App() {
 
     bootstrap();
 
-    if (!supabase?.auth) {
+    const sb = getSupabaseClient();
+    if (!sb?.auth) {
       return () => {
         mounted = false;
       };
     }
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    const { data: sub } = sb.auth.onAuthStateChange(async (_event, nextSession) => {
       setSession(nextSession);
       if (nextSession?.user) {
         setIsAdmin(await loadIsAdmin(nextSession.user.id));
@@ -80,7 +100,9 @@ function App() {
   }, []);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    const sb = getSupabaseClient();
+    if (!sb?.auth) return;
+    await sb.auth.signOut();
   }
 
   return html`
@@ -121,7 +143,10 @@ function App() {
 }
 
 async function loadIsAdmin(userId) {
-  const { data, error } = await supabase
+  const sb = getSupabaseClient();
+  if (!sb) return false;
+
+  const { data, error } = await sb
     .from('profiles')
     .select('role')
     .eq('user_id', userId)
@@ -142,7 +167,14 @@ function LoginModal({ onClose, onSuccess }) {
     setBusy(true);
     setError('');
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const sb = getSupabaseClient();
+    if (!sb?.auth) {
+      setBusy(false);
+      setError('Supabase client not initialized');
+      return;
+    }
+
+    const { error: signInError } = await sb.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -205,11 +237,12 @@ function GalleryPage({ isAdmin, user }) {
     setError('');
 
     try {
-      if (!supabase) {
+      const sb = getSupabaseClient();
+      if (!sb) {
         throw new Error('Supabase client not initialized');
       }
 
-      let query = supabase
+      let query = sb
         .from('artworks')
         .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,created_at')
         .order('created_at', { ascending: false });
@@ -330,7 +363,14 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
       status: form.status,
     };
 
-    const { error: updateError } = await supabase
+    const sb = getSupabaseClient();
+    if (!sb) {
+      setBusy(false);
+      setError('Supabase client not initialized');
+      return;
+    }
+
+    const { error: updateError } = await sb
       .from('artworks')
       .update(payload)
       .eq('id', artwork.id);
@@ -454,7 +494,14 @@ function CreateArtworkModal({ user, onClose, onCreated }) {
       created_by: user.id,
     };
 
-    const { error: insertError } = await supabase.from('artworks').insert(payload);
+    const sb = getSupabaseClient();
+    if (!sb) {
+      setBusy(false);
+      setError('Supabase client not initialized');
+      return;
+    }
+
+    const { error: insertError } = await sb.from('artworks').insert(payload);
 
     setBusy(false);
 
