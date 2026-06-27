@@ -367,6 +367,10 @@ function GalleryPage({ isAdmin, user }) {
                 }
                 await loadArtworks();
               }}
+              onDeleted=${async () => {
+                setActive(null);
+                await loadArtworks();
+              }}
             />
           `
         : null}
@@ -387,10 +391,11 @@ function GalleryPage({ isAdmin, user }) {
   `;
 }
 
-function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved }) {
+function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved, onDeleted }) {
   useEscapeToClose(onClose);
 
   const [editing, setEditing] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
@@ -493,6 +498,25 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved }) {
     }
   }
 
+  async function handleDelete() {
+    setBusy(true);
+    setError('');
+    const sb = getSupabaseClient();
+    if (!sb) {
+      setBusy(false);
+      setError('Supabase client not initialized');
+      return;
+    }
+    try {
+      const { error: deleteError } = await sb.from('artworks').delete().eq('id', artwork.id);
+      if (deleteError) throw deleteError;
+      await onDeleted(artwork.id);
+    } catch (err) {
+      setError(err?.message || 'Delete failed');
+      setBusy(false);
+    }
+  }
+
   const detailRows = useMemo(
     () => [
       ['Medium', artwork.medium],
@@ -556,13 +580,24 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved }) {
                 </label>
               </div>
               ${error ? html`<p className="error-text">${error}</p>` : null}
-              <div className="modal-actions">
-                <button className="btn btn-secondary" onClick=${() => setEditing(false)}>Cancel</button>
-                <button className="btn btn-primary${busy ? ' btn-loading' : ''}" disabled=${busy} onClick=${save}>
-                  ${busy
-                    ? html`<span className="btn-loading-inner"><span className="inline-spinner" aria-hidden="true"></span>${uploadStatus || 'Saving…'}</span>`
-                    : 'Save'}
-                </button>
+              <div className="modal-actions-edit">
+                <div className="modal-actions-delete">
+                  ${deleteConfirm
+                    ? html`
+                        <span className="delete-confirm-text">Permanently delete?</span>
+                        <button className="btn btn-danger-sm" disabled=${busy} onClick=${handleDelete}>Yes, delete</button>
+                        <button className="btn btn-secondary" onClick=${() => setDeleteConfirm(false)}>No</button>
+                      `
+                    : html`<button className="btn btn-danger-sm" onClick=${() => setDeleteConfirm(true)}>Delete</button>`}
+                </div>
+                <div className="modal-actions-save">
+                  <button className="btn btn-secondary" disabled=${busy} onClick=${() => { setEditing(false); setDeleteConfirm(false); }}>Cancel</button>
+                  <button className="btn btn-primary${busy ? ' btn-loading' : ''}" disabled=${busy} onClick=${save}>
+                    ${busy
+                      ? html`<span className="btn-loading-inner"><span className="inline-spinner" aria-hidden="true"></span>${uploadStatus || 'Saving…'}</span>`
+                      : 'Save'}
+                  </button>
+                </div>
               </div>
             `
           : html`
