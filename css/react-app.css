@@ -222,6 +222,53 @@
   margin-top: 8px;
 }
 
+/* edit mode: delete on left, cancel+save on right */
+.modal-actions-edit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.modal-actions-delete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-actions-save {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.delete-confirm-text {
+  font-size: 0.85rem;
+  color: #c0392b;
+}
+
+.btn-danger-sm {
+  background: transparent;
+  border: 1px solid #e74c3c;
+  color: #c0392b;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.btn-danger-sm:hover {
+  background: #fdf0ef;
+}
+
+.btn-danger-sm:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .checkbox-row {
   display: flex !important;
   align-items: center;
