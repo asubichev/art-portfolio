@@ -360,7 +360,10 @@ function GalleryPage({ isAdmin, user }) {
               artwork=${active}
               isAdmin=${isAdmin}
               onClose=${() => setActive(null)}
-              onSaved=${async () => {
+              onSaved=${async (updatedArtwork) => {
+                if (updatedArtwork?.id === active?.id) {
+                  setActive(updatedArtwork);
+                }
                 await loadArtworks();
               }}
             />
@@ -426,10 +429,12 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
       return;
     }
 
-    const { error: updateError } = await sb
+    const { data: updatedArtwork, error: updateError } = await sb
       .from('artworks')
       .update(payload)
-      .eq('id', artwork.id);
+      .eq('id', artwork.id)
+      .select('*')
+      .single();
 
     setBusy(false);
 
@@ -439,7 +444,7 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
     }
 
     setEditing(false);
-    await onSaved();
+    await onSaved(updatedArtwork ?? { ...artwork, ...payload });
   }
 
   const detailRows = useMemo(
