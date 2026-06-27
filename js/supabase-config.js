@@ -12,14 +12,12 @@ const supabaseLib = window.supabase;
 if (!supabaseLib?.createClient) {
   console.error('[Art Portfolio] Supabase SDK failed to load from CDN.');
 } else {
-  const supabase = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  const client = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
     },
   });
 
-  window.supabaseClient = supabase;
+  window.supabaseClient = client;
 }
-
-window.supabaseClient = supabase;
