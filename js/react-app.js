@@ -23,6 +23,13 @@ function getSupabaseClient() {
   return window.supabaseClient;
 }
 
+function getPublicUrl(path) {
+  const sb = getSupabaseClient();
+  if (!sb?.storage || !path) return '';
+  const { data } = sb.storage.from('artworks').getPublicUrl(path);
+  return data?.publicUrl ?? '';
+}
+
 function getHashRoute() {
   const hash = window.location.hash || '#/gallery';
   const route = hash.replace(/^#/, '');
@@ -244,7 +251,7 @@ function GalleryPage({ isAdmin, user }) {
 
       let query = sb
         .from('artworks')
-        .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,created_at')
+        .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,image_path,thumb_path,created_at')
         .order('created_at', { ascending: false });
 
       if (!isAdmin) {
@@ -295,20 +302,27 @@ function GalleryPage({ isAdmin, user }) {
 
       <div className="react-gallery-grid">
         ${artworks.map(
-          (art) => html`
+          (art) => {
+            const thumbUrl = getPublicUrl(art.thumb_path || art.image_path);
+            return html`
             <button
               key=${art.id}
               className="art-card"
               onClick=${() => setActive(art)}
             >
-              <div className="art-card-visual">No photo yet</div>
+              <div className="art-card-visual">
+                ${thumbUrl
+                  ? html`<img src=${thumbUrl} alt=${art.title || 'Artwork'} loading="lazy" />`
+                  : 'No photo yet'}
+              </div>
               <div className="art-card-meta">
                 <h3>${art.title}</h3>
                 <p>${[art.medium, art.year].filter(Boolean).join(' · ') || 'Untitled metadata'}</p>
                 ${isAdmin ? html`<span className="status-pill">${art.status}</span>` : null}
               </div>
             </button>
-          `,
+          `;
+          },
         )}
       </div>
 
@@ -415,6 +429,8 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
     [artwork],
   );
 
+  const popupImageUrl = getPublicUrl(artwork.thumb_path || artwork.image_path);
+
   return html`
     <div className="modal-backdrop" onClick=${onClose}>
       <div className="modal-card modal-card-lg" onClick=${(e) => e.stopPropagation()}>
@@ -452,9 +468,18 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
             `
           : html`
               <div className="artwork-details">
+                ${popupImageUrl
+                  ? html`
+                      <div className="artwork-modal-image-wrap">
+                        <img src=${popupImageUrl} alt=${artwork.title || 'Artwork'} className="artwork-modal-image" />
+                      </div>
+                    `
+                  : null}
                 <p className="artwork-description-focus">${artwork.description || 'No description provided.'}</p>
                 <dl>
-                  ${detailRows.map(([label, value]) => html`<><dt>${label}</dt><dd>${String(value)}</dd></>`)}
+                  ${detailRows.map(
+                    ([label, value]) => html`<${React.Fragment}><dt>${label}</dt><dd>${String(value)}</dd><//>`,
+                  )}
                 </dl>
               </div>
               <div className="modal-actions">
