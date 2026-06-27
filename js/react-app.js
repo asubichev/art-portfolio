@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'https://esm.sh/react@18.3.1';
+import React, { useEffect, useMemo, useRef, useState } from 'https://esm.sh/react@18.3.1';
 import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
 import htm from 'https://esm.sh/htm@3.1.1';
 
@@ -21,6 +21,26 @@ function getSupabaseClient() {
   });
 
   return window.supabaseClient;
+}
+
+function getPublicUrl(path) {
+  const sb = getSupabaseClient();
+  if (!sb?.storage || !path) return '';
+  const { data } = sb.storage.from('artworks').getPublicUrl(path);
+  return data?.publicUrl ?? '';
+}
+
+function useEscapeToClose(onClose) {
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 }
 
 function getHashRoute() {
@@ -123,7 +143,7 @@ function App() {
           ? (route === '/gallery'
               ? html`<${GalleryPage} isAdmin=${isAdmin} user=${session?.user ?? null} />`
               : html`<p className="page-loading">Redirecting…</p>`)
-          : html`<p className="page-loading">Loading…</p>`}
+          : html`<p className="page-loading loading-pulse">Loading…</p>`}
       </main>
 
       <footer className="site-footer">
@@ -157,10 +177,20 @@ async function loadIsAdmin(userId) {
 }
 
 function LoginModal({ onClose, onSuccess }) {
+  useEscapeToClose(onClose);
+
+  const formRef = useRef(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  function submitOnEnter(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      formRef.current?.requestSubmit();
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -193,13 +223,15 @@ function LoginModal({ onClose, onSuccess }) {
     <div className="modal-backdrop" onClick=${onClose}>
       <div className="modal-card" onClick=${(e) => e.stopPropagation()}>
         <h3>Login</h3>
-        <form onSubmit=${handleSubmit} className="auth-form">
+        <form ref=${formRef} onSubmit=${handleSubmit} className="auth-form">
           <label>
             Email
             <input
               type="email"
               required
+              autoFocus
               value=${email}
+              onKeyDown=${submitOnEnter}
               onChange=${(e) => setEmail(e.target.value)}
             />
           </label>
@@ -209,14 +241,17 @@ function LoginModal({ onClose, onSuccess }) {
               type="password"
               required
               value=${password}
+              onKeyDown=${submitOnEnter}
               onChange=${(e) => setPassword(e.target.value)}
             />
           </label>
-          ${error ? html`<p className="error-text">${error}</p>` : null}
+          ${error ? html`<p className="error-text error-pop">${error}</p>` : null}
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick=${onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled=${busy}>
-              ${busy ? 'Signing in…' : 'Sign in'}
+            <button type="submit" className="btn btn-primary ${busy ? 'btn-loading' : ''}" disabled=${busy}>
+              ${busy
+                ? html`<span className="btn-loading-inner"><span className="inline-spinner" aria-hidden="true"></span>Signing in…</span>`
+                : 'Sign in'}
             </button>
           </div>
         </form>
@@ -244,7 +279,7 @@ function GalleryPage({ isAdmin, user }) {
 
       let query = sb
         .from('artworks')
-        .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,created_at')
+        .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,image_path,thumb_path,created_at')
         .order('created_at', { ascending: false });
 
       if (!isAdmin) {
@@ -295,20 +330,27 @@ function GalleryPage({ isAdmin, user }) {
 
       <div className="react-gallery-grid">
         ${artworks.map(
-          (art) => html`
+          (art) => {
+            const thumbUrl = getPublicUrl(art.thumb_path || art.image_path);
+            return html`
             <button
               key=${art.id}
               className="art-card"
               onClick=${() => setActive(art)}
             >
-              <div className="art-card-visual">No photo yet</div>
+              <div className="art-card-visual">
+                ${thumbUrl
+                  ? html`<img src=${thumbUrl} alt=${art.title || 'Artwork'} loading="lazy" />`
+                  : 'No photo yet'}
+              </div>
               <div className="art-card-meta">
                 <h3>${art.title}</h3>
                 <p>${[art.medium, art.year].filter(Boolean).join(' · ') || 'Untitled metadata'}</p>
                 ${isAdmin ? html`<span className="status-pill">${art.status}</span>` : null}
               </div>
             </button>
-          `,
+          `;
+          },
         )}
       </div>
 
@@ -318,7 +360,10 @@ function GalleryPage({ isAdmin, user }) {
               artwork=${active}
               isAdmin=${isAdmin}
               onClose=${() => setActive(null)}
-              onSaved=${async () => {
+              onSaved=${async (updatedArtwork) => {
+                if (updatedArtwork?.id === active?.id) {
+                  setActive(updatedArtwork);
+                }
                 await loadArtworks();
               }}
             />
@@ -342,6 +387,8 @@ function GalleryPage({ isAdmin, user }) {
 }
 
 function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
+  useEscapeToClose(onClose);
+
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -382,10 +429,12 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
       return;
     }
 
-    const { error: updateError } = await sb
+    const { data: updatedArtwork, error: updateError } = await sb
       .from('artworks')
       .update(payload)
-      .eq('id', artwork.id);
+      .eq('id', artwork.id)
+      .select('*')
+      .single();
 
     setBusy(false);
 
@@ -395,7 +444,7 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
     }
 
     setEditing(false);
-    await onSaved();
+    await onSaved(updatedArtwork ?? { ...artwork, ...payload });
   }
 
   const detailRows = useMemo(
@@ -414,6 +463,8 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
     ].filter(([, value]) => value !== null && value !== undefined && value !== ''),
     [artwork],
   );
+
+  const popupImageUrl = getPublicUrl(artwork.thumb_path || artwork.image_path);
 
   return html`
     <div className="modal-backdrop" onClick=${onClose}>
@@ -452,9 +503,18 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
             `
           : html`
               <div className="artwork-details">
+                ${popupImageUrl
+                  ? html`
+                      <div className="artwork-modal-image-wrap">
+                        <img src=${popupImageUrl} alt=${artwork.title || 'Artwork'} className="artwork-modal-image" />
+                      </div>
+                    `
+                  : null}
                 <p className="artwork-description-focus">${artwork.description || 'No description provided.'}</p>
                 <dl>
-                  ${detailRows.map(([label, value]) => html`<><dt>${label}</dt><dd>${String(value)}</dd></>`)}
+                  ${detailRows.map(
+                    ([label, value]) => html`<${React.Fragment}><dt>${label}</dt><dd>${String(value)}</dd><//>`,
+                  )}
                 </dl>
               </div>
               <div className="modal-actions">
@@ -470,6 +530,8 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
 }
 
 function CreateArtworkModal({ user, onClose, onCreated }) {
+  useEscapeToClose(onClose);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
