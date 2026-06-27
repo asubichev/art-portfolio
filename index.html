@@ -6,35 +6,14 @@
     <meta name="description" content="Art portfolio — original paintings, prints, and more." />
     <title>Art Portfolio</title>
     <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/react-app.css" />
   </head>
   <body>
-    <header class="site-header">
-      <a href="index.html" class="site-logo">Portfolio</a>
-      <nav class="site-nav" aria-label="Site navigation">
-        <a href="index.html">Gallery</a>
-        <a href="mailto:asubichev@gmail.com">Contact</a>
-      </nav>
-    </header>
-
-    <main>
-      <section class="gallery-section" aria-label="Gallery">
-        <h2>Works</h2>
-        <p id="gallery-loading" aria-live="polite">Loading…</p>
-        <p id="gallery-error" hidden aria-live="assertive"></p>
-        <div id="gallery-grid" role="list" aria-label="Artwork gallery"></div>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <p>&copy; <span id="footer-year"></span> Art Portfolio. All rights reserved.</p>
-    </footer>
+    <div id="app"></div>
 
     <!-- Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="js/supabase-config.js"></script>
-    <script src="js/gallery.js"></script>
-    <script>
-      document.getElementById('footer-year').textContent = new Date().getFullYear();
-    </script>
+    <script type="module" src="js/react-app.js"></script>
   </body>
 </html>
