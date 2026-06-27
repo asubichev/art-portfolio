@@ -76,6 +76,24 @@
   margin: 16px 0;
 }
 
+.gallery-empty-state {
+  margin: 16px 0 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.gallery-empty-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.gallery-empty-body {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
 .error-text {
   color: #c0392b;
 }

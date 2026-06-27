@@ -280,6 +280,18 @@ function GalleryPage({ isAdmin, user }) {
 
       ${loading ? html`<p className="page-loading">Loading…</p>` : null}
       ${error ? html`<p className="error-text">Failed to load gallery: ${error}</p>` : null}
+      ${!loading && !error && artworks.length === 0
+        ? html`
+            <div className="gallery-empty-state" role="status" aria-live="polite">
+              <p className="gallery-empty-title">No works yet.</p>
+              <p className="gallery-empty-body">
+                ${isAdmin
+                  ? 'Use “Add work” to create your first artwork, then set status to published to show it publicly.'
+                  : 'Please check back soon.'}
+              </p>
+            </div>
+          `
+        : null}
 
       <div className="react-gallery-grid">
         ${artworks.map(
