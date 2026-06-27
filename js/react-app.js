@@ -537,7 +537,7 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved }) {
                     </button>
                     ${replaceFile ? html`<span className="upload-replace-note">New photo staged — will upload on save</span>` : null}
                   </div>
-                  <input ref=${replaceInputRef} type="file" accept="image/*" style="display:none" onChange=${handleReplaceFile} />
+                  <input ref=${replaceInputRef} type="file" accept="image/*" style=${{display:'none'}} onChange=${handleReplaceFile} />
                 </div>
                 <label>Title<input value=${form.title} onChange=${(e) => setField('title', e.target.value)} /></label>
                 <label>Description<textarea rows="4" value=${form.description} onChange=${(e) => setField('description', e.target.value)} /></label>
@@ -746,7 +746,7 @@ function CreateArtworkModal({ user, onClose, onCreated }) {
             ref=${fileInputRef}
             type="file"
             accept="image/*"
-            style="display:none"
+            style=${{display:'none'}}
             onChange=${handleFileChange}
           />
 
