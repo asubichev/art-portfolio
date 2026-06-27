@@ -141,6 +141,12 @@
   max-width: 740px;
 }
 
+.modal-card-artwork {
+  max-width: 900px;
+  padding: 0;
+  overflow: hidden;
+}
+
 .modal-header-row {
   display: flex;
   align-items: flex-start;
@@ -180,39 +186,139 @@
   font: inherit;
 }
 
-.artwork-description-focus {
-  font-size: 1.03rem;
-  line-height: 1.7;
-  margin-bottom: 14px;
+/* ---- ArtworkModal split layout (view mode) ---- */
+.artwork-modal-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 480px;
 }
 
-.artwork-modal-image-wrap {
-  margin-bottom: 14px;
-  border-radius: 8px;
+.artwork-modal-left {
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  background: #f7f7f7;
+  background: #f0f0f0;
 }
 
-.artwork-modal-image {
+.artwork-modal-img {
   display: block;
   width: 100%;
-  max-height: 380px;
+  height: 100%;
   object-fit: cover;
 }
 
-.artwork-details dl {
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 8px 12px;
+.artwork-modal-no-img {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
 }
 
-.artwork-details dt {
+.artwork-modal-right {
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  max-height: 90vh;
+}
+
+.artwork-modal-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.artwork-modal-title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.artwork-modal-title {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.artwork-modal-medium {
+  margin: 0;
+  font-size: 0.9rem;
   color: var(--color-text-muted);
 }
 
-.artwork-details dd {
+.artwork-modal-top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.avail-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.avail-pill--yes {
+  background: #d4edda;
+  color: #155724;
+}
+
+.avail-pill--no {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.artwork-modal-description {
   margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.artwork-modal-meta {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.artwork-modal-meta dt {
+  color: #bbb;
+  font-weight: normal;
+}
+
+.artwork-modal-meta dd {
+  margin: 0;
+  color: #999;
+}
+
+.artwork-modal-right .modal-actions {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+/* edit mode wrapper */
+.artwork-modal-edit-wrap {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: 90vh;
+}
+
+/* responsive: stack on narrow screens */
+@media (max-width: 640px) {
+  .artwork-modal-split {
+    grid-template-columns: 1fr;
+  }
+
+  .artwork-modal-left {
+    min-height: 220px;
+  }
 }
 
 .modal-actions {
