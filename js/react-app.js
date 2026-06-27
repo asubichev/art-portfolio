@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'https://esm.sh/react@18.3.1';
+import React, { useEffect, useMemo, useRef, useState } from 'https://esm.sh/react@18.3.1';
 import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
 import htm from 'https://esm.sh/htm@3.1.1';
 
@@ -28,6 +28,19 @@ function getPublicUrl(path) {
   if (!sb?.storage || !path) return '';
   const { data } = sb.storage.from('artworks').getPublicUrl(path);
   return data?.publicUrl ?? '';
+}
+
+function useEscapeToClose(onClose) {
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 }
 
 function getHashRoute() {
@@ -130,7 +143,7 @@ function App() {
           ? (route === '/gallery'
               ? html`<${GalleryPage} isAdmin=${isAdmin} user=${session?.user ?? null} />`
               : html`<p className="page-loading">Redirecting…</p>`)
-          : html`<p className="page-loading">Loading…</p>`}
+          : html`<p className="page-loading loading-pulse">Loading…</p>`}
       </main>
 
       <footer className="site-footer">
@@ -164,10 +177,20 @@ async function loadIsAdmin(userId) {
 }
 
 function LoginModal({ onClose, onSuccess }) {
+  useEscapeToClose(onClose);
+
+  const formRef = useRef(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  function submitOnEnter(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      formRef.current?.requestSubmit();
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -200,13 +223,15 @@ function LoginModal({ onClose, onSuccess }) {
     <div className="modal-backdrop" onClick=${onClose}>
       <div className="modal-card" onClick=${(e) => e.stopPropagation()}>
         <h3>Login</h3>
-        <form onSubmit=${handleSubmit} className="auth-form">
+        <form ref=${formRef} onSubmit=${handleSubmit} className="auth-form">
           <label>
             Email
             <input
               type="email"
               required
+              autoFocus
               value=${email}
+              onKeyDown=${submitOnEnter}
               onChange=${(e) => setEmail(e.target.value)}
             />
           </label>
@@ -216,14 +241,17 @@ function LoginModal({ onClose, onSuccess }) {
               type="password"
               required
               value=${password}
+              onKeyDown=${submitOnEnter}
               onChange=${(e) => setPassword(e.target.value)}
             />
           </label>
-          ${error ? html`<p className="error-text">${error}</p>` : null}
+          ${error ? html`<p className="error-text error-pop">${error}</p>` : null}
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick=${onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled=${busy}>
-              ${busy ? 'Signing in…' : 'Sign in'}
+            <button type="submit" className="btn btn-primary ${busy ? 'btn-loading' : ''}" disabled=${busy}>
+              ${busy
+                ? html`<span className="btn-loading-inner"><span className="inline-spinner" aria-hidden="true"></span>Signing in…</span>`
+                : 'Sign in'}
             </button>
           </div>
         </form>
@@ -356,6 +384,8 @@ function GalleryPage({ isAdmin, user }) {
 }
 
 function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
+  useEscapeToClose(onClose);
+
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -495,6 +525,8 @@ function ArtworkModal({ artwork, isAdmin, onClose, onSaved }) {
 }
 
 function CreateArtworkModal({ user, onClose, onCreated }) {
+  useEscapeToClose(onClose);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({

@@ -83,6 +83,10 @@
   margin: 16px 0;
 }
 
+.loading-pulse {
+  animation: loadingPulse 0.9s ease-in-out infinite;
+}
+
 .gallery-empty-state {
   margin: 16px 0 24px;
   padding: 14px 16px;
@@ -105,6 +109,10 @@
   color: #c0392b;
 }
 
+.error-pop {
+  animation: errorPopIn 180ms ease-out;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -114,6 +122,7 @@
   justify-content: center;
   padding: 16px;
   z-index: 1000;
+  animation: modalBackdropIn 160ms ease-out;
 }
 
 .modal-card {
@@ -124,6 +133,8 @@
   padding: 16px;
   max-height: 90vh;
   overflow: auto;
+  transform-origin: center;
+  animation: modalCardIn 180ms ease-out;
 }
 
 .modal-card-lg {
@@ -215,4 +226,72 @@
   display: flex !important;
   align-items: center;
   gap: 8px !important;
+}
+
+.btn-loading {
+  min-width: 112px;
+}
+
+.btn-loading-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loadingPulse {
+  0% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes errorPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
