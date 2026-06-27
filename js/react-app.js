@@ -517,15 +517,12 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved, onDeleted }) {
     }
   }
 
-  const detailRows = useMemo(
+  const metaRows = useMemo(
     () => [
-      ['Medium', artwork.medium],
       ['Material', artwork.material],
       ['Dimensions', artwork.dimensions],
       ['Year', artwork.year],
       ['Price', artwork.price ? `$${Number(artwork.price).toLocaleString('en-US')}` : null],
-      ['Status', artwork.status],
-      ['Available', artwork.available ? 'Yes' : 'No'],
       ['Prints', artwork.prints_type],
       ['Print qty', artwork.print_qty],
       ['Print size', artwork.print_size],
@@ -538,15 +535,15 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved, onDeleted }) {
 
   return html`
     <div className="modal-backdrop" onClick=${onClose}>
-      <div className="modal-card modal-card-lg" onClick=${(e) => e.stopPropagation()}>
-        <div className="modal-header-row">
-          <h3>${artwork.title}</h3>
-          <button className="icon-btn" onClick=${onClose} aria-label="Close">×</button>
-        </div>
-
+      <div className="modal-card modal-card-artwork" onClick=${(e) => e.stopPropagation()}>
         ${editing
           ? html`
-              <div className="modal-content-grid">
+              <div className="artwork-modal-edit-wrap">
+                <div className="modal-header-row">
+                  <h3>Edit: ${artwork.title}</h3>
+                  <button className="icon-btn" onClick=${onClose} aria-label="Close">×</button>
+                </div>
+                <div className="modal-content-grid">
                 <div className="upload-replace-row">
                   ${(replacePreviewUrl || getPublicUrl(artwork.thumb_path || artwork.image_path))
                     ? html`<img
@@ -599,28 +596,52 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved, onDeleted }) {
                   </button>
                 </div>
               </div>
+              </div>
             `
           : html`
-              <div className="artwork-details">
-                ${popupImageUrl
-                  ? html`
-                      <div className="artwork-modal-image-wrap">
-                        <img src=${popupImageUrl} alt=${artwork.title || 'Artwork'} className="artwork-modal-image" />
-                      </div>
-                    `
-                  : null}
-                <p className="artwork-description-focus">${artwork.description || 'No description provided.'}</p>
-                <dl>
-                  ${detailRows.map(
-                    ([label, value]) => html`<${React.Fragment}><dt>${label}</dt><dd>${String(value)}</dd><//>`,
-                  )}
-                </dl>
-              </div>
-              <div className="modal-actions">
-                ${isAdmin
-                  ? html`<button className="btn btn-primary" onClick=${() => setEditing(true)}>Edit</button>`
-                  : null}
-                <button className="btn btn-secondary" onClick=${onClose}>Close</button>
+              <div className="artwork-modal-split">
+                <div className="artwork-modal-left">
+                  ${popupImageUrl
+                    ? html`<img src=${popupImageUrl} alt=${artwork.title || 'Artwork'} className="artwork-modal-img" />`
+                    : html`<div className="artwork-modal-no-img">No photo yet</div>`}
+                </div>
+                <div className="artwork-modal-right">
+                  <div className="artwork-modal-top-row">
+                    <div className="artwork-modal-title-block">
+                      <h2 className="artwork-modal-title">${artwork.title}</h2>
+                      ${artwork.medium ? html`<p className="artwork-modal-medium">${artwork.medium}</p>` : null}
+                    </div>
+                    <div className="artwork-modal-top-right">
+                      ${artwork.available !== null && artwork.available !== undefined
+                        ? html`<span className="avail-pill ${artwork.available ? 'avail-pill--yes' : 'avail-pill--no'}">${artwork.available ? 'Available' : 'Unavailable'}</span>`
+                        : null}
+                      <button className="icon-btn" onClick=${onClose} aria-label="Close">×</button>
+                    </div>
+                  </div>
+
+                  ${artwork.description
+                    ? html`<p className="artwork-modal-description">${artwork.description}</p>`
+                    : null}
+
+                  ${isAdmin ? html`<span className="status-pill">${artwork.status}</span>` : null}
+
+                  ${metaRows.length > 0
+                    ? html`
+                        <dl className="artwork-modal-meta">
+                          ${metaRows.map(
+                            ([label, value]) => html`<${React.Fragment}><dt>${label}</dt><dd>${String(value)}</dd><//>`,
+                          )}
+                        </dl>
+                      `
+                    : null}
+
+                  <div className="modal-actions">
+                    ${isAdmin
+                      ? html`<button className="btn btn-primary" onClick=${() => setEditing(true)}>Edit</button>`
+                      : null}
+                    <button className="btn btn-secondary" onClick=${onClose}>Close</button>
+                  </div>
+                </div>
               </div>
             `}
       </div>
