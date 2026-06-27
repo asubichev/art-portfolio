@@ -1,28 +1,50 @@
 import React, { useEffect, useMemo, useState } from 'https://esm.sh/react@18.3.1';
 import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
-import {
-  HashRouter,
-  Link,
-  Navigate,
-  Route,
-  Routes,
-  useNavigate,
-} from 'https://esm.sh/react-router-dom@6.28.1';
 import htm from 'https://esm.sh/htm@3.1.1';
 
 const html = htm.bind(React.createElement);
 const supabase = window.supabaseClient;
 
+function getHashRoute() {
+  const hash = window.location.hash || '#/gallery';
+  const route = hash.replace(/^#/, '');
+  return route || '/gallery';
+}
+
+function useHashRoute() {
+  const [route, setRoute] = useState(getHashRoute());
+
+  useEffect(() => {
+    const onHashChange = () => setRoute(getHashRoute());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  return route;
+}
+
 function App() {
+  const route = useHashRoute();
   const [session, setSession] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
+    if (!window.location.hash) {
+      window.location.replace('#/gallery');
+    }
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
 
     async function bootstrap() {
+      if (!supabase?.auth) {
+        setAuthReady(true);
+        return;
+      }
+
       const { data } = await supabase.auth.getSession();
       if (!mounted) return;
       const sess = data?.session ?? null;
@@ -34,6 +56,12 @@ function App() {
     }
 
     bootstrap();
+
+    if (!supabase?.auth) {
+      return () => {
+        mounted = false;
+      };
+    }
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       setSession(nextSession);
@@ -60,7 +88,7 @@ function App() {
       <header className="site-header react-header">
         <div className="site-logo">Portfolio</div>
         <nav className="site-nav" aria-label="Site navigation">
-          <${Link} to="/gallery">Gallery<//>
+          <a href="#/gallery">Gallery</a>
           ${session
             ? html`<button className="nav-btn" onClick=${handleLogout}>Logout</button>`
             : html`<button className="nav-btn" onClick=${() => setShowLogin(true)}>Login</button>`}
@@ -70,21 +98,9 @@ function App() {
 
       <main>
         ${authReady
-          ? html`
-              <${Routes}>
-                <${Route} path="/" element=${html`<${Navigate} to="/gallery" replace />`} />
-                <${Route}
-                  path="/gallery"
-                  element=${html`
-                    <${GalleryPage}
-                      isAdmin=${isAdmin}
-                      user=${session?.user ?? null}
-                    />
-                  `}
-                />
-                <${Route} path="*" element=${html`<${Navigate} to="/gallery" replace />`} />
-              <//>
-            `
+          ? (route === '/gallery'
+              ? html`<${GalleryPage} isAdmin=${isAdmin} user=${session?.user ?? null} />`
+              : html`<p className="page-loading">Redirecting…</p>`)
           : html`<p className="page-loading">Loading…</p>`}
       </main>
 
@@ -485,5 +501,5 @@ function CreateArtworkModal({ user, onClose, onCreated }) {
 }
 
 createRoot(document.getElementById('app')).render(
-  html`<${React.StrictMode}><${HashRouter}><${App} /><//><//>`,
+  html`<${React.StrictMode}><${App} /><//>`,
 );
