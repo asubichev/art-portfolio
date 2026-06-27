@@ -204,25 +204,32 @@ function GalleryPage({ isAdmin, user }) {
     setLoading(true);
     setError('');
 
-    let query = supabase
-      .from('artworks')
-      .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,created_at')
-      .order('created_at', { ascending: false });
+    try {
+      if (!supabase) {
+        throw new Error('Supabase client not initialized');
+      }
 
-    if (!isAdmin) {
-      query = query.eq('status', 'published');
+      let query = supabase
+        .from('artworks')
+        .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,created_at')
+        .order('created_at', { ascending: false });
+
+      if (!isAdmin) {
+        query = query.eq('status', 'published');
+      }
+
+      const { data, error: loadError } = await query;
+
+      if (loadError) {
+        throw loadError;
+      }
+
+      setArtworks(data ?? []);
+    } catch (err) {
+      setError(err?.message || 'Unexpected error while loading artworks');
+    } finally {
+      setLoading(false);
     }
-
-    const { data, error: loadError } = await query;
-
-    setLoading(false);
-
-    if (loadError) {
-      setError(loadError.message);
-      return;
-    }
-
-    setArtworks(data ?? []);
   }
 
   useEffect(() => {
