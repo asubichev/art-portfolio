@@ -36,6 +36,9 @@
 }
 
 .art-card {
+  display: block;          /* prevent inline/button rendering quirks */
+  -webkit-appearance: none;
+  appearance: none;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   border-radius: 8px;
@@ -48,7 +51,7 @@
 /* Admin compact thumbnail: fixed height */
 .art-card-admin .art-card-visual {
   height: 140px;
-  position: relative; /* anchor for absolute-positioned img */
+  align-items: stretch; /* img fills full height, no centering gap */
 }
 
 /* Masonry/fluid: natural height, but guarantee a minimum so imageless
@@ -68,10 +71,8 @@
   overflow: hidden;
 }
 
-/* Admin: absolutely fill fixed-height container — avoids flex centering gaps */
+/* Admin: fill fixed-height container */
 .art-card-admin .art-card-visual img {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
