@@ -401,38 +401,20 @@ function GalleryPage({ isAdmin, user }) {
               <p className="gallery-empty-title">No works yet.</p>
               <p className="gallery-empty-body">
                 ${isAdmin
-                  ? 'Use “Add work” to create your first artwork, then set status to published to show it publicly.'
+                  ? 'Use "Add work" to create your first artwork, then set status to published to show it publicly.'
                   : 'Please check back soon.'}
               </p>
             </div>
           `
         : null}
 
-      <div className="react-gallery-grid">
-        ${artworks.map(
-          (art) => {
-            const thumbUrl = getPublicUrl(art.thumb_path || art.image_path);
-            return html`
-            <button
-              key=${art.id}
-              className="art-card"
-              onClick=${() => setActive(art)}
-            >
-              <div className="art-card-visual">
-                ${thumbUrl
-                  ? html`<img src=${thumbUrl} alt=${art.title || 'Artwork'} loading="lazy" />`
-                  : 'No photo yet'}
-              </div>
-              <div className="art-card-meta">
-                <h3>${art.title}</h3>
-                <p>${[art.medium, art.year].filter(Boolean).join(' · ') || 'Untitled metadata'}</p>
-                ${isAdmin ? html`<span className="status-pill">${art.status}</span>` : null}
-              </div>
-            </button>
-          `;
-          },
-        )}
-      </div>
+      ${!loading && !error && artworks.length > 0
+        ? (isAdmin
+          ? html`<${AdminGallery} artworks=${artworks} isAdmin=${isAdmin} onSelect=${(art) => setActive(art)} />`
+          : artworks.length < 5
+          ? html`<${FluidGallery} artworks=${artworks} onSelect=${(art) => setActive(art)} />`
+          : html`<${MasonryGallery} artworks=${artworks} onSelect=${(art) => setActive(art)} />`)
+        : null}
 
       ${active
         ? html`
@@ -468,6 +450,169 @@ function GalleryPage({ isAdmin, user }) {
           `
         : null}
     </section>
+  `;
+}
+
+function ArtworkCard({ art, isAdmin, variant, cardWidth, onSelect }) {
+  const thumbUrl = getPublicUrl(art.thumb_path || art.image_path);
+  const style = cardWidth != null ? { width: `${cardWidth}px` } : {};
+  return html`
+    <button
+      key=${art.id}
+      className="art-card art-card-${variant}"
+      style=${style}
+      onClick=${() => onSelect(art)}
+    >
+      <div className="art-card-visual">
+        ${thumbUrl
+          ? html`<img src=${thumbUrl} alt=${art.title || 'Artwork'} loading="lazy" />`
+          : html`<span className="art-card-no-photo">No photo yet</span>`}
+      </div>
+      <div className="art-card-meta">
+        <h3>${art.title}</h3>
+        ${[art.medium, art.year].filter(Boolean).length > 0
+          ? html`<p>${[art.medium, art.year].filter(Boolean).join(' · ')}</p>`
+          : null}
+        ${isAdmin ? html`<span className="status-pill">${art.status}</span>` : null}
+      </div>
+    </button>
+  `;
+}
+
+function AdminGallery({ artworks, isAdmin, onSelect }) {
+  return html`
+    <div className="react-gallery-admin">
+      ${artworks.map((art) => html`
+        <${ArtworkCard}
+          key=${art.id}
+          art=${art}
+          isAdmin=${isAdmin}
+          variant="admin"
+          onSelect=${onSelect}
+        />
+      `)}
+    </div>
+  `;
+}
+
+function FluidGallery({ artworks, onSelect }) {
+  const containerRef = useRef(null);
+  const [cardWidth, setCardWidth] = useState(null);
+
+  function computeLayout() {
+    const el = containerRef.current;
+    if (!el) return;
+    const count = artworks.length;
+    const gap = 16;
+    const containerWidth = el.offsetWidth;
+    const naturalWidth = Math.floor((containerWidth - gap * (count - 1)) / count);
+    setCardWidth(Math.min(480, naturalWidth));
+  }
+
+  useEffect(() => {
+    computeLayout();
+    let debounceTimer = null;
+    function onResize() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(computeLayout, 120);
+    }
+    window.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('resize', onResize); clearTimeout(debounceTimer); };
+  }, [artworks.length]);
+
+  const gridStyle = cardWidth != null
+    ? { gridTemplateColumns: `repeat(${artworks.length}, ${cardWidth}px)`, justifyContent: 'center' }
+    : {};
+
+  return html`
+    <div className="react-gallery-fluid" style=${gridStyle} ref=${containerRef}>
+      ${artworks.map((art) => html`
+        <${ArtworkCard}
+          key=${art.id}
+          art=${art}
+          isAdmin=${false}
+          variant="fluid"
+          onSelect=${onSelect}
+        />
+      `)}
+    </div>
+  `;
+}
+
+function MasonryGallery({ artworks, onSelect }) {
+  const containerRef = useRef(null);
+  const masonryRef = useRef(null);
+  const [cardWidth, setCardWidth] = useState(null);
+
+  function computeLayout() {
+    const el = containerRef.current;
+    if (!el) return;
+    const containerWidth = el.offsetWidth;
+    const count = artworks.length;
+    const desiredCols = Math.min(5, Math.ceil(Math.sqrt(count)));
+    const numCols = Math.min(desiredCols, Math.max(1, Math.floor(containerWidth / 200)));
+    const gap = 16;
+    const totalGap = gap * (numCols - 1);
+    const width = Math.floor((containerWidth - totalGap) / numCols);
+    setCardWidth(width);
+  }
+
+  // Initialise / reinitialise Masonry after cards render
+  useEffect(() => {
+    if (cardWidth == null || !containerRef.current) return;
+    if (!window.Masonry) return;
+
+    if (masonryRef.current) {
+      masonryRef.current.destroy();
+      masonryRef.current = null;
+    }
+
+    // Small delay so DOM has updated with new widths
+    const timer = setTimeout(() => {
+      masonryRef.current = new window.Masonry(containerRef.current, {
+        itemSelector: '.art-card-masonry',
+        columnWidth: '.art-card-masonry',
+        gutter: 16,
+        fitWidth: false,
+        transitionDuration: '0.2s',
+      });
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [cardWidth, artworks.length]);
+
+  // Resize observer
+  useEffect(() => {
+    computeLayout();
+    let debounceTimer = null;
+    function onResize() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(computeLayout, 120);
+    }
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      clearTimeout(debounceTimer);
+      if (masonryRef.current) {
+        masonryRef.current.destroy();
+        masonryRef.current = null;
+      }
+    };
+  }, [artworks.length]);
+
+  return html`
+    <div className="react-gallery-masonry" ref=${containerRef}>
+      ${artworks.map((art) => html`
+        <${ArtworkCard}
+          key=${art.id}
+          art=${art}
+          isAdmin=${false}
+          variant="masonry"
+          cardWidth=${cardWidth}
+          onSelect=${onSelect}
+        />
+      `)}
+    </div>
   `;
 }
 

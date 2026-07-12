@@ -19,13 +19,28 @@
   margin-bottom: 20px;
 }
 
-.react-gallery-grid {
+.react-gallery-admin {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
 }
 
+.react-gallery-fluid {
+  display: grid;
+  gap: 16px;
+}
+
+.react-gallery-masonry {
+  /* Masonry.js controls layout; position:relative required */
+  position: relative;
+  padding-bottom: 24px; /* buffer so last cards don't touch the footer */
+}
+
 .art-card {
+  display: flex;           /* flex column so visual is always flush at top */
+  flex-direction: column;
+  -webkit-appearance: none;
+  appearance: none;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   border-radius: 8px;
@@ -33,23 +48,60 @@
   cursor: pointer;
   padding: 0;
   overflow: hidden;
+  width: 100%;             /* prevent flex from shrinking button in grid */
+}
+
+/* Admin compact thumbnail: fixed height */
+.art-card-admin .art-card-visual {
+  height: 140px;
+  align-items: stretch; /* img fills full height, no centering gap */
+}
+
+/* Masonry/fluid: natural height, but guarantee a minimum so imageless
+   cards don't collapse and break Masonry's layout calculations */
+.art-card-masonry .art-card-visual,
+.art-card-fluid .art-card-visual {
+  min-height: 200px;
 }
 
 .art-card-visual {
-  height: 140px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #f1f1f1;
   color: var(--color-text-muted);
   font-size: 0.9rem;
+  overflow: hidden;
 }
 
-.art-card-visual img {
+/* Admin: fill fixed-height container */
+.art-card-admin .art-card-visual img {
   width: 100%;
-  height: 100%;
   object-fit: cover;
   display: block;
+  /* height is controlled by align-items:stretch on parent */
+}
+
+/* "No photo yet" placeholder — needs align-self:center so it stays
+   centered even when the visual uses align-items:stretch for the img */
+.art-card-no-photo {
+  align-self: center;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+/* Fluid & masonry: natural aspect ratio, no cropping */
+.art-card-fluid .art-card-visual img,
+.art-card-masonry .art-card-visual img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Masonry.js only sets horizontal gutter; vertical gap is CSS */
+.art-card-masonry {
+  margin-bottom: 16px;
 }
 
 .art-card-meta {
@@ -608,4 +660,107 @@
   margin: 0;
   font-size: 0.8rem;
   color: var(--color-text-muted);
+}
+
+/* ---- Masonry crop tool (ArtworkModal edit mode) ---- */
+.crop-tool-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.crop-tool-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.crop-tool-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.crop-tool-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+/* The full image with the draggable 3:4 overlay */
+.crop-tool-canvas {
+  position: relative;
+  width: 280px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  cursor: crosshair;
+  user-select: none;
+}
+
+.crop-tool-canvas-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Semi-dark overlay covering the whole canvas, punched out at the crop frame */
+.crop-tool-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The bright 3:4 frame showing exactly what will appear in the card */
+.crop-tool-frame {
+  position: absolute;
+  aspect-ratio: 3 / 4;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+/* Live 3:4 mini-preview */
+.crop-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.crop-preview-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.crop-preview-card {
+  width: 100px;
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.crop-preview-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.crop-no-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: #fafafa;
+  text-align: center;
 }
