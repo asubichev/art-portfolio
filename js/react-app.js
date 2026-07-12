@@ -278,7 +278,7 @@ function classifyGalleryError(err) {
     return {
       kind: 'network',
       userMessage: 'Gallery temporarily unavailable',
-      hint: 'Could not reach Supabase. The database may be down or still starting up — refresh the page to try again.',
+      hint: 'Could not reach the gallery server. It may be down or still starting up — refresh the page to try again.',
       detail: message,
       httpStatus: null,
       timestamp,
@@ -312,7 +312,7 @@ function GalleryErrorState({ error }) {
   const [showDetails, setShowDetails] = useState(false);
 
   const kindLabel =
-    error.kind === 'network' ? 'Network error (Supabase unreachable)'
+    error.kind === 'network' ? 'Network error (server unreachable)'
     : error.kind === 'api' ? 'API error'
     : 'Unknown error';
 
