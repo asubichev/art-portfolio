@@ -278,7 +278,7 @@ function classifyGalleryError(err) {
     return {
       kind: 'network',
       userMessage: 'Gallery temporarily unavailable',
-      hint: 'Could not reach the gallery server. It may be down or still starting up — refresh the page to try again.',
+      hint: 'Could not reach the gallery server. It may be down or still starting up.',
       detail: message,
       httpStatus: null,
       timestamp,
