@@ -466,7 +466,7 @@ function ArtworkCard({ art, isAdmin, variant, cardWidth, onSelect }) {
       <div className="art-card-visual">
         ${thumbUrl
           ? html`<img src=${thumbUrl} alt=${art.title || 'Artwork'} loading="lazy" />`
-          : 'No photo yet'}
+          : html`<span className="art-card-no-photo">No photo yet</span>`}
       </div>
       <div className="art-card-meta">
         <h3>${art.title}</h3>
