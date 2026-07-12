@@ -33,6 +33,7 @@
 .react-gallery-masonry {
   /* Masonry.js controls layout; position:relative required */
   position: relative;
+  padding-bottom: 24px; /* buffer so last cards don't touch the footer */
 }
 
 .art-card {
