@@ -470,7 +470,9 @@ function ArtworkCard({ art, isAdmin, variant, cardWidth, onSelect }) {
       </div>
       <div className="art-card-meta">
         <h3>${art.title}</h3>
-        <p>${[art.medium, art.year].filter(Boolean).join(' · ') || 'Untitled metadata'}</p>
+        ${[art.medium, art.year].filter(Boolean).length > 0
+          ? html`<p>${[art.medium, art.year].filter(Boolean).join(' · ')}</p>`
+          : null}
         ${isAdmin ? html`<span className="status-pill">${art.status}</span>` : null}
       </div>
     </button>
