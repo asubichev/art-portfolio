@@ -48,6 +48,7 @@
 /* Admin compact thumbnail: fixed height */
 .art-card-admin .art-card-visual {
   height: 140px;
+  position: relative; /* anchor for absolute-positioned img */
 }
 
 /* Masonry/fluid: natural height, but guarantee a minimum so imageless
@@ -67,8 +68,10 @@
   overflow: hidden;
 }
 
-/* Admin: fill fixed-height container */
+/* Admin: absolutely fill fixed-height container — avoids flex centering gaps */
 .art-card-admin .art-card-visual img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -81,6 +84,11 @@
   width: 100%;
   height: auto;
   display: block;
+}
+
+/* Masonry.js only sets horizontal gutter; vertical gap is CSS */
+.art-card-masonry {
+  margin-bottom: 16px;
 }
 
 .art-card-meta {
