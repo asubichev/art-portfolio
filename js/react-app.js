@@ -260,17 +260,10 @@ function LoginModal({ onClose, onSuccess }) {
   `;
 }
 
-/**
- * Classifies a gallery fetch error into a structured object so the UI can
- * show a clean message while still surfacing diagnostic details.
- */
 function classifyGalleryError(err) {
   const timestamp = new Date().toISOString();
   const message = err?.message || String(err) || 'Unknown error';
 
-  // Network-level failures: server unreachable, Cloudflare error, DNS failure, etc.
-  // The Supabase SDK wraps the native TypeError before rethrowing, so we match
-  // on message content rather than instanceof to catch both the raw and wrapped form.
   const isNetworkError =
     /NetworkError|Failed to fetch|Load failed|network request failed/i.test(message);
 
@@ -285,7 +278,6 @@ function classifyGalleryError(err) {
     };
   }
 
-  // Supabase API / HTTP errors carry a status code.
   const httpStatus = err?.status ?? err?.statusCode ?? null;
   if (httpStatus) {
     return {
