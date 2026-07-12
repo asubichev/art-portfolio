@@ -50,6 +50,13 @@
   height: 140px;
 }
 
+/* Masonry/fluid: natural height, but guarantee a minimum so imageless
+   cards don't collapse and break Masonry's layout calculations */
+.art-card-masonry .art-card-visual,
+.art-card-fluid .art-card-visual {
+  min-height: 200px;
+}
+
 .art-card-visual {
   display: flex;
   align-items: center;
