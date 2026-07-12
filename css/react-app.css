@@ -114,10 +114,6 @@
   color: var(--color-text-muted);
 }
 
-.gallery-error-retry {
-  margin-top: 4px;
-}
-
 .gallery-error-details-toggle {
   background: none;
   border: none;

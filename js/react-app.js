@@ -269,15 +269,16 @@ function classifyGalleryError(err) {
   const message = err?.message || String(err) || 'Unknown error';
 
   // Network-level failures: server unreachable, Cloudflare error, DNS failure, etc.
+  // The Supabase SDK wraps the native TypeError before rethrowing, so we match
+  // on message content rather than instanceof to catch both the raw and wrapped form.
   const isNetworkError =
-    err instanceof TypeError &&
     /NetworkError|Failed to fetch|Load failed|network request failed/i.test(message);
 
   if (isNetworkError) {
     return {
       kind: 'network',
       userMessage: 'Gallery temporarily unavailable',
-      hint: 'The database server could not be reached — it may still be starting up. Try again in a moment.',
+      hint: 'Could not reach Supabase. The database may be down or still starting up — refresh the page to try again.',
       detail: message,
       httpStatus: null,
       timestamp,
@@ -307,11 +308,11 @@ function classifyGalleryError(err) {
   };
 }
 
-function GalleryErrorState({ error, onRetry }) {
+function GalleryErrorState({ error }) {
   const [showDetails, setShowDetails] = useState(false);
 
   const kindLabel =
-    error.kind === 'network' ? 'Network error'
+    error.kind === 'network' ? 'Network error (Supabase unreachable)'
     : error.kind === 'api' ? 'API error'
     : 'Unknown error';
 
@@ -322,9 +323,6 @@ function GalleryErrorState({ error, onRetry }) {
         ${error.userMessage}
       </p>
       <p className="gallery-error-hint">${error.hint}</p>
-      <button className="btn btn-secondary gallery-error-retry" onClick=${onRetry}>
-        Try again
-      </button>
       <button
         className="gallery-error-details-toggle"
         onClick=${() => setShowDetails((prev) => !prev)}
@@ -404,7 +402,7 @@ function GalleryPage({ isAdmin, user }) {
       </div>
 
       ${loading ? html`<p className="page-loading">Loading…</p>` : null}
-      ${error ? html`<${GalleryErrorState} error=${error} onRetry=${loadArtworks} />` : null}
+      ${error ? html`<${GalleryErrorState} error=${error} />` : null}
       ${!loading && !error && artworks.length === 0
         ? html`
             <div className="gallery-empty-state" role="status" aria-live="polite">
