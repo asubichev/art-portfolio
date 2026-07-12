@@ -19,6 +19,12 @@
   margin-bottom: 20px;
 }
 
+.react-gallery-admin {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
 .react-gallery-fluid {
   display: grid;
   gap: 16px;
@@ -39,14 +45,9 @@
   overflow: hidden;
 }
 
-/* Fluid mode: card fills its grid cell, 3:4 portrait */
-.art-card-fluid .art-card-visual {
-  aspect-ratio: 3 / 4;
-}
-
-/* Masonry mode: 3:4 portrait crop */
-.art-card-masonry .art-card-visual {
-  aspect-ratio: 3 / 4;
+/* Admin compact thumbnail: fixed height */
+.art-card-admin .art-card-visual {
+  height: 140px;
 }
 
 .art-card-visual {
@@ -59,10 +60,19 @@
   overflow: hidden;
 }
 
-.art-card-visual img {
+/* Admin: fill fixed-height container */
+.art-card-admin .art-card-visual img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+
+/* Fluid & masonry: natural aspect ratio, no cropping */
+.art-card-fluid .art-card-visual img,
+.art-card-masonry .art-card-visual img {
+  width: 100%;
+  height: auto;
   display: block;
 }
 

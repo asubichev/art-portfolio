@@ -357,7 +357,7 @@ function GalleryPage({ isAdmin, user }) {
 
       let query = sb
         .from('artworks')
-        .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,image_path,thumb_path,masonry_crop_x,masonry_crop_y,created_at')
+        .select('id,title,description,medium,material,dimensions,year,price,status,available,prints_type,print_qty,print_size,print_price,image_path,thumb_path,created_at')
         .order('created_at', { ascending: false });
 
       if (!isAdmin) {
@@ -409,9 +409,11 @@ function GalleryPage({ isAdmin, user }) {
         : null}
 
       ${!loading && !error && artworks.length > 0
-        ? (artworks.length < 5
-          ? html`<${FluidGallery} artworks=${artworks} isAdmin=${isAdmin} onSelect=${(art) => setActive(art)} />`
-          : html`<${MasonryGallery} artworks=${artworks} isAdmin=${isAdmin} onSelect=${(art) => setActive(art)} />`)
+        ? (isAdmin
+          ? html`<${AdminGallery} artworks=${artworks} isAdmin=${isAdmin} onSelect=${(art) => setActive(art)} />`
+          : artworks.length < 5
+          ? html`<${FluidGallery} artworks=${artworks} onSelect=${(art) => setActive(art)} />`
+          : html`<${MasonryGallery} artworks=${artworks} onSelect=${(art) => setActive(art)} />`)
         : null}
 
       ${active
@@ -452,8 +454,6 @@ function GalleryPage({ isAdmin, user }) {
 }
 
 function ArtworkCard({ art, isAdmin, variant, cardWidth, onSelect }) {
-  const cropX = art.masonry_crop_x ?? 50;
-  const cropY = art.masonry_crop_y ?? 50;
   const thumbUrl = getPublicUrl(art.thumb_path || art.image_path);
   const style = cardWidth != null ? { width: `${cardWidth}px` } : {};
   return html`
@@ -465,12 +465,7 @@ function ArtworkCard({ art, isAdmin, variant, cardWidth, onSelect }) {
     >
       <div className="art-card-visual">
         ${thumbUrl
-          ? html`<img
-              src=${thumbUrl}
-              alt=${art.title || 'Artwork'}
-              loading="lazy"
-              style=${{ objectPosition: `${cropX}% ${cropY}%` }}
-            />`
+          ? html`<img src=${thumbUrl} alt=${art.title || 'Artwork'} loading="lazy" />`
           : 'No photo yet'}
       </div>
       <div className="art-card-meta">
@@ -482,16 +477,58 @@ function ArtworkCard({ art, isAdmin, variant, cardWidth, onSelect }) {
   `;
 }
 
-function FluidGallery({ artworks, isAdmin, onSelect }) {
-  const count = artworks.length;
-  const style = { gridTemplateColumns: `repeat(${count}, 1fr)` };
+function AdminGallery({ artworks, isAdmin, onSelect }) {
   return html`
-    <div className="react-gallery-fluid" style=${style}>
+    <div className="react-gallery-admin">
       ${artworks.map((art) => html`
         <${ArtworkCard}
           key=${art.id}
           art=${art}
           isAdmin=${isAdmin}
+          variant="admin"
+          onSelect=${onSelect}
+        />
+      `)}
+    </div>
+  `;
+}
+
+function FluidGallery({ artworks, onSelect }) {
+  const containerRef = useRef(null);
+  const [cardWidth, setCardWidth] = useState(null);
+
+  function computeLayout() {
+    const el = containerRef.current;
+    if (!el) return;
+    const count = artworks.length;
+    const gap = 16;
+    const containerWidth = el.offsetWidth;
+    const naturalWidth = Math.floor((containerWidth - gap * (count - 1)) / count);
+    setCardWidth(Math.min(480, naturalWidth));
+  }
+
+  useEffect(() => {
+    computeLayout();
+    let debounceTimer = null;
+    function onResize() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(computeLayout, 120);
+    }
+    window.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('resize', onResize); clearTimeout(debounceTimer); };
+  }, [artworks.length]);
+
+  const gridStyle = cardWidth != null
+    ? { gridTemplateColumns: `repeat(${artworks.length}, ${cardWidth}px)`, justifyContent: 'center' }
+    : {};
+
+  return html`
+    <div className="react-gallery-fluid" style=${gridStyle} ref=${containerRef}>
+      ${artworks.map((art) => html`
+        <${ArtworkCard}
+          key=${art.id}
+          art=${art}
+          isAdmin=${false}
           variant="fluid"
           onSelect=${onSelect}
         />
@@ -500,7 +537,7 @@ function FluidGallery({ artworks, isAdmin, onSelect }) {
   `;
 }
 
-function MasonryGallery({ artworks, isAdmin, onSelect }) {
+function MasonryGallery({ artworks, onSelect }) {
   const containerRef = useRef(null);
   const masonryRef = useRef(null);
   const [cardWidth, setCardWidth] = useState(null);
@@ -567,106 +604,12 @@ function MasonryGallery({ artworks, isAdmin, onSelect }) {
         <${ArtworkCard}
           key=${art.id}
           art=${art}
-          isAdmin=${isAdmin}
+          isAdmin=${false}
           variant="masonry"
           cardWidth=${cardWidth}
           onSelect=${onSelect}
         />
       `)}
-    </div>
-  `;
-}
-
-function MasonryCropTool({ imageUrl, cropX, cropY, onCropChange }) {
-  const canvasRef = useRef(null);
-  const draggingRef = useRef(false);
-
-  // Frame dimensions relative to the 280px canvas: frame width fills canvas, height = width * 4/3
-  const CANVAS_W = 280;
-  // Computed frame size: full width, 3:4 ratio
-  const frameW = CANVAS_W;
-  const frameH = Math.round(CANVAS_W * 4 / 3);
-
-  function pointerToPercent(e) {
-    const el = canvasRef.current;
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    const imgH = rect.height;
-    const imgW = rect.width;
-    // Frame center tracks the pointer, clamped so frame stays inside image
-    const halfFrameW = (frameW / imgW) * 50; // in percent
-    const halfFrameH = (frameH / imgH) * 50;
-    const rawX = ((e.clientX - rect.left) / imgW) * 100;
-    const rawY = ((e.clientY - rect.top) / imgH) * 100;
-    const x = Math.round(Math.min(100 - halfFrameW, Math.max(halfFrameW, rawX)));
-    const y = Math.round(Math.min(100 - halfFrameH, Math.max(halfFrameH, rawY)));
-    return { x, y };
-  }
-
-  function onPointerDown(e) {
-    e.preventDefault();
-    canvasRef.current?.setPointerCapture(e.pointerId);
-    draggingRef.current = true;
-    const pt = pointerToPercent(e);
-    if (pt) onCropChange(pt.x, pt.y);
-  }
-
-  function onPointerMove(e) {
-    if (!draggingRef.current) return;
-    const pt = pointerToPercent(e);
-    if (pt) onCropChange(pt.x, pt.y);
-  }
-
-  function onPointerUp() {
-    draggingRef.current = false;
-  }
-
-  if (!imageUrl) {
-    return html`
-      <div className="crop-tool-section">
-        <span className="crop-tool-label">Masonry crop</span>
-        <p className="crop-no-image">Add a photo above to set the masonry crop position.</p>
-      </div>
-    `;
-  }
-
-  // Frame position: top-left corner in percent of canvas size
-  const frameCSSLeft = `${cropX}%`;
-  const frameCSSTop = `${cropY}%`;
-  const frameStyle = {
-    width: `${(frameW / CANVAS_W) * 100}%`,
-    aspectRatio: '3 / 4',
-    transform: 'translate(-50%, -50%)',
-    left: frameCSSLeft,
-    top: frameCSSTop,
-  };
-
-  return html`
-    <div className="crop-tool-section">
-      <span className="crop-tool-label">Masonry crop</span>
-      <p className="crop-tool-hint">Click or drag to set which part of the image shows in the masonry card.</p>
-      <div className="crop-tool-body">
-        <div
-          className="crop-tool-canvas"
-          ref=${canvasRef}
-          onPointerDown=${onPointerDown}
-          onPointerMove=${onPointerMove}
-          onPointerUp=${onPointerUp}
-        >
-          <img src=${imageUrl} alt="Crop reference" className="crop-tool-canvas-img" draggable="false" />
-          <div className="crop-tool-frame" style=${frameStyle}></div>
-        </div>
-        <div className="crop-preview-wrap">
-          <span className="crop-preview-label">Preview</span>
-          <div className="crop-preview-card">
-            <img
-              src=${imageUrl}
-              alt="Crop preview"
-              style=${{ objectPosition: `${cropX}% ${cropY}%` }}
-            />
-          </div>
-        </div>
-      </div>
     </div>
   `;
 }
@@ -692,8 +635,6 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved, onDeleted }) {
     price: artwork.price ?? '',
     status: artwork.status ?? 'draft',
   }));
-  const [cropX, setCropX] = useState(artwork.masonry_crop_x ?? 50);
-  const [cropY, setCropY] = useState(artwork.masonry_crop_y ?? 50);
 
   function setField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -758,8 +699,6 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved, onDeleted }) {
         year: form.year ? Number(form.year) : null,
         price: form.price ? Number(form.price) : null,
         status: form.status,
-        masonry_crop_x: cropX,
-        masonry_crop_y: cropY,
         ...imagePaths,
       };
 
@@ -844,12 +783,6 @@ function ArtworkModal({ artwork, isAdmin, user, onClose, onSaved, onDeleted }) {
                   </div>
                   <input ref=${replaceInputRef} type="file" accept="image/*" style=${{display:'none'}} onChange=${handleReplaceFile} />
                 </div>
-                <${MasonryCropTool}
-                  imageUrl=${replacePreviewUrl || getPublicUrl(artwork.image_path)}
-                  cropX=${cropX}
-                  cropY=${cropY}
-                  onCropChange=${(x, y) => { setCropX(x); setCropY(y); }}
-                />
                 <label>Title<input value=${form.title} onChange=${(e) => setField('title', e.target.value)} /></label>
                 <label>Description<textarea rows="4" value=${form.description} onChange=${(e) => setField('description', e.target.value)} /></label>
                 <label>Medium<input value=${form.medium} onChange=${(e) => setField('medium', e.target.value)} /></label>
