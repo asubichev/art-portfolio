@@ -3,15 +3,17 @@
  *
  * Handles:
  *  - Authentication (login / logout via Supabase Auth)
- *  - Artwork list (all statuses)
+ *  - Artwork list with inline-editable cards
  *  - Single & bulk image upload with client-side processing
- *  - Metadata create / edit
- *  - Publish / archive / draft toggle
- *  - Delete
+ *  - Inline metadata editing with save/cancel (per card)
+ *  - Drag-and-drop photo replacement on existing artworks
+ *  - Bulk status change and bulk delete (word-confirmation friction)
  */
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let currentUser = null;
+const selectedIds = new Set();
+let currentlyEditingCard = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -24,14 +26,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderAuthState();
   });
 
-  // Login form
   document.getElementById('login-form').addEventListener('submit', handleLogin);
-
-  // Upload form
   document.getElementById('upload-form').addEventListener('submit', handleUpload);
-
-  // File input preview
   document.getElementById('upload-files').addEventListener('change', handleFilePreview);
+
+  // Cancel any in-progress card edit when clicking outside all cards
+  document.addEventListener('click', (e) => {
+    if (!currentlyEditingCard) return;
+    if (!currentlyEditingCard.contains(e.target)) cancelCard(currentlyEditingCard);
+  });
+
+  // Bulk toolbar
+  document.getElementById('bulk-status-apply')?.addEventListener('click', () => {
+    handleBulkStatusChange(document.getElementById('bulk-status-select').value);
+  });
+  document.getElementById('bulk-delete-btn')?.addEventListener('click', handleBulkDelete);
+
+  // Bulk delete confirmation modal
+  document.getElementById('bulk-delete-confirm-btn')?.addEventListener('click', confirmBulkDelete);
+  document.getElementById('bulk-delete-cancel-btn')?.addEventListener('click', hideBulkDeleteModal);
+  document.getElementById('bulk-delete-word-input')?.addEventListener('input', checkBulkDeleteWord);
+  document.getElementById('bulk-delete-modal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('bulk-delete-modal')) hideBulkDeleteModal();
+  });
 });
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -66,10 +83,7 @@ async function handleLogin(e) {
 
   btn.disabled = false;
   btn.textContent = 'Sign in';
-
-  if (error) {
-    loginError.textContent = error.message;
-  }
+  if (error) loginError.textContent = error.message;
 }
 
 document.getElementById('logout-btn')?.addEventListener('click', async () => {
@@ -81,9 +95,13 @@ async function loadArtworks() {
   const list = document.getElementById('artworks-list');
   list.innerHTML = '<p class="loading-text">Loading…</p>';
 
+  selectedIds.clear();
+  currentlyEditingCard = null;
+  updateBulkToolbar();
+
   const { data: artworks, error } = await supabase
     .from('artworks')
-    .select('id, title, status, medium, year, thumb_path, created_at')
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -96,7 +114,8 @@ async function loadArtworks() {
     return;
   }
 
-  renderArtworkList(artworks, list);
+  list.innerHTML = '';
+  artworks.forEach((art) => list.appendChild(buildArtworkCard(art)));
 }
 
 function getPublicUrl(path) {
@@ -105,96 +124,457 @@ function getPublicUrl(path) {
   return data?.publicUrl ?? '';
 }
 
-function renderArtworkList(artworks, container) {
-  container.innerHTML = '';
+// ─── Card building ────────────────────────────────────────────────────────────
+function buildArtworkCard(art) {
+  const thumbUrl = getPublicUrl(art.thumb_path);
+  const card = document.createElement('div');
+  card.className = `artwork-card artwork-card--${art.status}`;
+  card.dataset.id = art.id;
 
-  artworks.forEach((art) => {
-    const thumbUrl = getPublicUrl(art.thumb_path);
-    const row = document.createElement('div');
-    row.className = `artwork-row artwork-row--${art.status}`;
-    row.dataset.id = art.id;
+  card.innerHTML = `
+    <div class="artwork-card-img-wrap">
+      ${thumbUrl
+        ? `<img class="artwork-card-img" src="${escapeAttr(thumbUrl)}" alt="${escapeAttr(art.title)}" loading="lazy">`
+        : `<div class="artwork-card-img-placeholder">No image</div>`}
+      <div class="artwork-card-img-overlay">
+        <span class="img-overlay-hint">Drop or click to replace</span>
+      </div>
+      <input type="file" class="img-replace-input" accept="image/jpeg,image/png,image/webp" tabindex="-1" aria-hidden="true">
+      <span class="status-badge status-badge--${escapeAttr(art.status)} card-status-badge">${escapeHtml(art.status)}</span>
+      <label class="bulk-check-label" title="Select">
+        <input type="checkbox" class="bulk-check">
+      </label>
+    </div>
 
-    row.innerHTML = `
-      <div class="artwork-row-thumb">
-        ${thumbUrl ? `<img src="${escapeAttr(thumbUrl)}" alt="${escapeAttr(art.title)}" loading="lazy">` : '<span class="no-thumb">—</span>'}
+    <div class="artwork-card-body">
+      <div class="card-field-title">
+        <input type="text" class="card-input card-input--title" data-field="title"
+          value="${escapeAttr(art.title)}" placeholder="Title *" aria-label="Title">
       </div>
-      <div class="artwork-row-info">
-        <strong class="artwork-row-title">${escapeHtml(art.title)}</strong>
-        <span class="artwork-row-meta">${[art.medium, art.year].filter(Boolean).join(', ')}</span>
-      </div>
-      <div class="artwork-row-status">
-        <span class="status-badge status-badge--${art.status}">${art.status}</span>
-      </div>
-      <div class="artwork-row-actions">
-        <button class="btn btn-sm btn-edit" data-id="${escapeAttr(art.id)}">Edit</button>
-        ${art.status !== 'published' ? `<button class="btn btn-sm btn-publish" data-id="${escapeAttr(art.id)}">Publish</button>` : ''}
-        ${art.status !== 'archived' ? `<button class="btn btn-sm btn-archive" data-id="${escapeAttr(art.id)}">Archive</button>` : ''}
-        ${art.status !== 'draft' ? `<button class="btn btn-sm btn-draft" data-id="${escapeAttr(art.id)}">Draft</button>` : ''}
-        <button class="btn btn-sm btn-delete" data-id="${escapeAttr(art.id)}">Delete</button>
-      </div>
-    `;
 
-    container.appendChild(row);
+      <div class="card-meta-row">
+        <input type="text" class="card-input card-input--meta" data-field="medium"
+          value="${escapeAttr(art.medium ?? '')}" placeholder="Medium" aria-label="Medium">
+        <input type="number" class="card-input card-input--meta card-input--year" data-field="year"
+          value="${escapeAttr(String(art.year ?? ''))}" placeholder="Year" min="1800" max="2100" aria-label="Year">
+      </div>
+
+      <div class="card-extended">
+        <textarea class="card-input card-input--textarea" data-field="description"
+          placeholder="Description" aria-label="Description" rows="3">${escapeHtml(art.description ?? '')}</textarea>
+
+        <div class="card-row">
+          <input type="text" class="card-input" data-field="material"
+            value="${escapeAttr(art.material ?? '')}" placeholder="Material" aria-label="Material">
+          <input type="text" class="card-input" data-field="dimensions"
+            value="${escapeAttr(art.dimensions ?? '')}" placeholder="Dimensions" aria-label="Dimensions">
+        </div>
+
+        <div class="card-row">
+          <input type="number" class="card-input" data-field="price"
+            value="${escapeAttr(String(art.price ?? ''))}" placeholder="Price (USD)" min="0" step="0.01" aria-label="Price">
+          <select class="card-input card-input--select" data-field="status" aria-label="Status">
+            <option value="draft"${art.status === 'draft' ? ' selected' : ''}>Draft</option>
+            <option value="published"${art.status === 'published' ? ' selected' : ''}>Published</option>
+            <option value="archived"${art.status === 'archived' ? ' selected' : ''}>Archived</option>
+          </select>
+        </div>
+
+        <div class="card-check-row">
+          <input type="checkbox" class="card-checkbox" data-field="available"
+            id="avail-${escapeAttr(art.id)}"${art.available ? ' checked' : ''}>
+          <label for="avail-${escapeAttr(art.id)}" class="card-check-label-text">Available for sale</label>
+        </div>
+
+        <p class="card-section-label">Prints</p>
+        <div class="card-row card-row--3">
+          <select class="card-input card-input--select" data-field="prints_type" aria-label="Prints type">
+            <option value="none"${(art.prints_type ?? 'none') === 'none' ? ' selected' : ''}>No prints</option>
+            <option value="open"${art.prints_type === 'open' ? ' selected' : ''}>Open edition</option>
+            <option value="limited"${art.prints_type === 'limited' ? ' selected' : ''}>Limited edition</option>
+          </select>
+          <input type="number" class="card-input" data-field="print_qty"
+            value="${escapeAttr(String(art.print_qty ?? ''))}" placeholder="Edition qty" min="1" aria-label="Edition quantity">
+          <input type="number" class="card-input" data-field="print_price"
+            value="${escapeAttr(String(art.print_price ?? ''))}" placeholder="Print price" min="0" step="0.01" aria-label="Print price">
+        </div>
+        <input type="text" class="card-input" data-field="print_size"
+          value="${escapeAttr(art.print_size ?? '')}" placeholder="Print size" aria-label="Print size">
+
+        <input type="text" class="card-input" data-field="seo_keywords"
+          value="${escapeAttr((art.seo_keywords ?? []).join(', '))}"
+          placeholder="SEO keywords (comma-separated)" aria-label="SEO keywords">
+
+        <div class="card-delete-row">
+          <button type="button" class="btn btn-sm btn-delete card-delete-btn">Delete artwork</button>
+        </div>
+      </div>
+
+      <div class="card-save-bar">
+        <button type="button" class="btn btn-sm card-cancel-btn">Cancel</button>
+        <button type="button" class="btn btn-sm btn-primary card-save-btn">Save changes</button>
+      </div>
+    </div>
+  `;
+
+  card._artData = { ...art };
+  card._dirty = false;
+  card._pendingImageFile = null;
+
+  wireCardEvents(card);
+  return card;
+}
+
+function wireCardEvents(card) {
+  const imgWrap = card.querySelector('.artwork-card-img-wrap');
+  const imgInput = card.querySelector('.img-replace-input');
+  const bulkCheckLabel = card.querySelector('.bulk-check-label');
+  const bulkCheck = card.querySelector('.bulk-check');
+  const saveBtn = card.querySelector('.card-save-btn');
+  const cancelBtn = card.querySelector('.card-cancel-btn');
+  const deleteBtn = card.querySelector('.card-delete-btn');
+
+  // Enter edit mode on focus; mark dirty on change
+  card.querySelectorAll('.card-input, .card-checkbox').forEach((el) => {
+    el.addEventListener('focus', () => enterEditMode(card));
+    el.addEventListener('input', () => markDirty(card));
+    el.addEventListener('change', () => markDirty(card));
   });
 
-  // Attach event listeners
-  container.querySelectorAll('.btn-edit').forEach((btn) =>
-    btn.addEventListener('click', () => openEditModal(btn.dataset.id)),
-  );
-  container.querySelectorAll('.btn-publish').forEach((btn) =>
-    btn.addEventListener('click', () => setStatus(btn.dataset.id, 'published')),
-  );
-  container.querySelectorAll('.btn-archive').forEach((btn) =>
-    btn.addEventListener('click', () => setStatus(btn.dataset.id, 'archived')),
-  );
-  container.querySelectorAll('.btn-draft').forEach((btn) =>
-    btn.addEventListener('click', () => setStatus(btn.dataset.id, 'draft')),
-  );
-  container.querySelectorAll('.btn-delete').forEach((btn) =>
-    btn.addEventListener('click', () => deleteArtwork(btn.dataset.id)),
-  );
+  // Image area: click enters edit mode + opens file picker
+  imgWrap.addEventListener('click', (e) => {
+    if (e.target.closest('.bulk-check-label')) return;
+    enterEditMode(card);
+    imgInput.click();
+  });
+  imgInput.addEventListener('change', () => {
+    if (imgInput.files[0]) applyPendingImage(card, imgInput.files[0]);
+  });
+
+  // Drag-and-drop image replacement
+  imgWrap.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    imgWrap.classList.add('drag-over');
+  });
+  imgWrap.addEventListener('dragleave', () => imgWrap.classList.remove('drag-over'));
+  imgWrap.addEventListener('drop', (e) => {
+    e.preventDefault();
+    imgWrap.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file?.type.startsWith('image/')) applyPendingImage(card, file);
+  });
+
+  // Save / cancel / delete
+  saveBtn.addEventListener('click', (e) => { e.stopPropagation(); saveCard(card); });
+  cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); cancelCard(card); });
+  deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteCard(card); });
+
+  // Bulk checkbox — stop propagation so clicking it doesn't trigger the document cancel-edit listener
+  bulkCheckLabel.addEventListener('click', (e) => e.stopPropagation());
+  bulkCheck.addEventListener('change', () => {
+    if (bulkCheck.checked) {
+      selectedIds.add(card.dataset.id);
+    } else {
+      selectedIds.delete(card.dataset.id);
+    }
+    updateBulkToolbar();
+  });
 }
 
-async function setStatus(id, status) {
-  const { error } = await supabase
-    .from('artworks')
-    .update({ status })
-    .eq('id', id);
+// ─── Card edit state ──────────────────────────────────────────────────────────
+function enterEditMode(card) {
+  if (currentlyEditingCard === card) return;
+  if (currentlyEditingCard) cancelCard(currentlyEditingCard);
+  currentlyEditingCard = card;
+  card.classList.add('artwork-card--editing');
+}
 
-  if (error) {
-    alert(`Failed to update status: ${error.message}`);
+function exitEditMode(card) {
+  card.classList.remove('artwork-card--editing', 'artwork-card--dirty');
+  card._dirty = false;
+  card._pendingImageFile = null;
+  card.querySelector('.card-save-bar').classList.remove('card-save-bar--visible');
+  if (currentlyEditingCard === card) currentlyEditingCard = null;
+}
+
+function markDirty(card) {
+  if (!card.classList.contains('artwork-card--editing') || card._dirty) return;
+  card._dirty = true;
+  card.classList.add('artwork-card--dirty');
+  card.querySelector('.card-save-bar').classList.add('card-save-bar--visible');
+}
+
+// ─── Card values ──────────────────────────────────────────────────────────────
+function getCardFieldValue(card, field) {
+  const el = card.querySelector(`[data-field="${field}"]`);
+  if (!el) return null;
+  return el.type === 'checkbox' ? el.checked : el.value;
+}
+
+function setCardFieldValue(card, field, value) {
+  const el = card.querySelector(`[data-field="${field}"]`);
+  if (!el) return;
+  if (el.type === 'checkbox') { el.checked = !!value; return; }
+  el.value = value ?? '';
+}
+
+function getCardValues(card) {
+  const g = (f) => getCardFieldValue(card, f);
+  return {
+    title: (g('title') ?? '').trim(),
+    description: (g('description') ?? '').trim() || null,
+    medium: (g('medium') ?? '').trim() || null,
+    material: (g('material') ?? '').trim() || null,
+    dimensions: (g('dimensions') ?? '').trim() || null,
+    year: g('year') ? parseInt(g('year'), 10) : null,
+    price: g('price') ? parseFloat(g('price')) : null,
+    available: g('available'),
+    prints_type: g('prints_type') || 'none',
+    print_qty: g('print_qty') ? parseInt(g('print_qty'), 10) : null,
+    print_size: (g('print_size') ?? '').trim() || null,
+    print_price: g('print_price') ? parseFloat(g('print_price')) : null,
+    seo_keywords: (g('seo_keywords') ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    status: g('status') || 'draft',
+  };
+}
+
+function restoreCardValues(card) {
+  const art = card._artData;
+  const s = (f, v) => setCardFieldValue(card, f, v);
+  s('title', art.title);
+  s('description', art.description ?? '');
+  s('medium', art.medium ?? '');
+  s('material', art.material ?? '');
+  s('dimensions', art.dimensions ?? '');
+  s('year', art.year ?? '');
+  s('price', art.price ?? '');
+  s('available', art.available);
+  s('prints_type', art.prints_type ?? 'none');
+  s('print_qty', art.print_qty ?? '');
+  s('print_size', art.print_size ?? '');
+  s('print_price', art.print_price ?? '');
+  s('seo_keywords', (art.seo_keywords ?? []).join(', '));
+  s('status', art.status);
+
+  // Restore image if a replacement was staged but not saved
+  if (card._pendingImageFile) {
+    const img = card.querySelector('.artwork-card-img');
+    const thumbUrl = getPublicUrl(art.thumb_path);
+    if (img && thumbUrl) img.src = thumbUrl;
+  }
+}
+
+function cancelCard(card) {
+  if (card._dirty) restoreCardValues(card);
+  exitEditMode(card);
+}
+
+async function saveCard(card) {
+  const id = card._artData.id;
+  const values = getCardValues(card);
+
+  if (!values.title) {
+    alert('Title is required.');
+    card.querySelector('[data-field="title"]')?.focus();
     return;
   }
-  loadArtworks();
+
+  const saveBtn = card.querySelector('.card-save-btn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  try {
+    if (card._pendingImageFile) {
+      const art = card._artData;
+      const [imageResult, thumbResult] = await Promise.all([
+        processImage(card._pendingImageFile),
+        generateThumbnail(card._pendingImageFile),
+      ]);
+
+      const uid = currentUser.id;
+      const uuid = crypto.randomUUID();
+      const imagePath = `${uid}/${uuid}/image.${imageResult.ext}`;
+      const thumbPath = `${uid}/${uuid}/thumb.${thumbResult.ext}`;
+
+      const [imgUpload, thumbUpload] = await Promise.all([
+        supabase.storage.from('artworks').upload(imagePath, imageResult.blob, {
+          contentType: imageResult.mimeType, cacheControl: '31536000', upsert: false,
+        }),
+        supabase.storage.from('artworks').upload(thumbPath, thumbResult.blob, {
+          contentType: thumbResult.mimeType, cacheControl: '31536000', upsert: false,
+        }),
+      ]);
+      if (imgUpload.error) throw imgUpload.error;
+      if (thumbUpload.error) throw thumbUpload.error;
+
+      const oldPaths = [art.image_path, art.thumb_path].filter(Boolean);
+      if (oldPaths.length) await supabase.storage.from('artworks').remove(oldPaths);
+
+      values.image_path = imagePath;
+      values.thumb_path = thumbPath;
+    }
+
+    const { error } = await supabase.from('artworks').update(values).eq('id', id);
+    if (error) throw error;
+
+    Object.assign(card._artData, values);
+
+    // Update status badge
+    const badge = card.querySelector('.card-status-badge');
+    if (badge) {
+      badge.textContent = values.status;
+      badge.className = `status-badge status-badge--${values.status} card-status-badge`;
+    }
+
+    // Reapply status class (preserve editing/dirty classes during transition)
+    const extra = [
+      card.classList.contains('artwork-card--editing') ? 'artwork-card--editing' : '',
+      card.classList.contains('artwork-card--dirty') ? 'artwork-card--dirty' : '',
+    ].filter(Boolean).join(' ');
+    card.className = `artwork-card artwork-card--${values.status}${extra ? ' ' + extra : ''}`;
+
+    exitEditMode(card);
+
+    card.classList.add('artwork-card--saved');
+    setTimeout(() => card.classList.remove('artwork-card--saved'), 800);
+  } catch (err) {
+    alert(`Failed to save: ${err.message}`);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save changes';
+  }
 }
 
-async function deleteArtwork(id) {
+async function deleteCard(card) {
   if (!confirm('Delete this artwork? This cannot be undone.')) return;
 
-  // Fetch paths first so we can clean up storage
-  const { data: art } = await supabase
-    .from('artworks')
-    .select('image_path, thumb_path')
-    .eq('id', id)
-    .single();
+  const art = card._artData;
+  const toDelete = [art.image_path, art.thumb_path].filter(Boolean);
+  if (toDelete.length) await supabase.storage.from('artworks').remove(toDelete);
 
-  if (art) {
-    const toDelete = [art.image_path, art.thumb_path].filter(Boolean);
-    if (toDelete.length) {
-      await supabase.storage.from('artworks').remove(toDelete);
+  const { error } = await supabase.from('artworks').delete().eq('id', art.id);
+  if (error) { alert(`Failed to delete: ${error.message}`); return; }
+
+  if (currentlyEditingCard === card) currentlyEditingCard = null;
+  selectedIds.delete(art.id);
+  updateBulkToolbar();
+
+  card.classList.add('artwork-card--removing');
+  setTimeout(() => card.remove(), 300);
+}
+
+// ─── Image replacement ────────────────────────────────────────────────────────
+function applyPendingImage(card, file) {
+  card._pendingImageFile = file;
+
+  const wrap = card.querySelector('.artwork-card-img-wrap');
+  const previewUrl = URL.createObjectURL(file);
+  let img = wrap.querySelector('.artwork-card-img');
+
+  if (img) {
+    img.src = previewUrl;
+  } else {
+    const placeholder = wrap.querySelector('.artwork-card-img-placeholder');
+    img = document.createElement('img');
+    img.className = 'artwork-card-img';
+    img.alt = card._artData.title;
+    img.src = previewUrl;
+    if (placeholder) {
+      placeholder.replaceWith(img);
+    } else {
+      wrap.prepend(img);
     }
   }
 
-  const { error } = await supabase.from('artworks').delete().eq('id', id);
-  if (error) {
-    alert(`Failed to delete: ${error.message}`);
-    return;
+  enterEditMode(card);
+  markDirty(card);
+}
+
+// ─── Bulk select ──────────────────────────────────────────────────────────────
+function updateBulkToolbar() {
+  const toolbar = document.getElementById('bulk-toolbar');
+  if (!toolbar) return;
+  const count = selectedIds.size;
+  toolbar.hidden = count === 0;
+  if (count > 0) {
+    const label = toolbar.querySelector('.bulk-count');
+    if (label) label.textContent = `${count} selected`;
   }
+}
+
+async function handleBulkStatusChange(status) {
+  if (!selectedIds.size) return;
+  const ids = [...selectedIds];
+  const { error } = await supabase.from('artworks').update({ status }).in('id', ids);
+  if (error) { alert(`Failed to update status: ${error.message}`); return; }
+  selectedIds.clear();
+  updateBulkToolbar();
+  loadArtworks();
+}
+
+// ─── Bulk delete ──────────────────────────────────────────────────────────────
+let _bulkDeleteWord = '';
+
+function randomWord() {
+  const consonants = 'bcdfghjklmnprstvwz';
+  const vowels = 'aeiou';
+  const len = 6 + Math.floor(Math.random() * 3);
+  let w = '';
+  for (let i = 0; i < len; i++) {
+    w += i % 2 === 0
+      ? consonants[Math.floor(Math.random() * consonants.length)]
+      : vowels[Math.floor(Math.random() * vowels.length)];
+  }
+  return w.toUpperCase();
+}
+
+function handleBulkDelete() {
+  if (!selectedIds.size) return;
+  _bulkDeleteWord = randomWord();
+  const modal = document.getElementById('bulk-delete-modal');
+  modal.querySelector('.bulk-delete-word').textContent = _bulkDeleteWord;
+  modal.querySelector('.bulk-delete-count').textContent = selectedIds.size;
+  document.getElementById('bulk-delete-word-input').value = '';
+  document.getElementById('bulk-delete-confirm-btn').disabled = true;
+  modal.hidden = false;
+  document.getElementById('bulk-delete-word-input').focus();
+}
+
+function checkBulkDeleteWord() {
+  const val = document.getElementById('bulk-delete-word-input').value.toUpperCase();
+  document.getElementById('bulk-delete-confirm-btn').disabled = val !== _bulkDeleteWord;
+}
+
+function hideBulkDeleteModal() {
+  document.getElementById('bulk-delete-modal').hidden = true;
+  _bulkDeleteWord = '';
+}
+
+async function confirmBulkDelete() {
+  hideBulkDeleteModal();
+  const ids = [...selectedIds];
+
+  const { data: artworks } = await supabase
+    .from('artworks')
+    .select('image_path, thumb_path')
+    .in('id', ids);
+
+  if (artworks?.length) {
+    const paths = artworks.flatMap((a) => [a.image_path, a.thumb_path].filter(Boolean));
+    if (paths.length) await supabase.storage.from('artworks').remove(paths);
+  }
+
+  const { error } = await supabase.from('artworks').delete().in('id', ids);
+  if (error) { alert(`Failed to delete: ${error.message}`); return; }
+
+  selectedIds.clear();
+  currentlyEditingCard = null;
+  updateBulkToolbar();
   loadArtworks();
 }
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
-let pendingFiles = []; // Array of { file, metaOverrides }
+let pendingFiles = [];
 
 function handleFilePreview(e) {
   const files = Array.from(e.target.files);
@@ -202,7 +582,6 @@ function handleFilePreview(e) {
 
   const preview = document.getElementById('upload-preview');
   preview.innerHTML = '';
-
   if (!files.length) return;
 
   files.forEach((file, idx) => {
@@ -218,7 +597,6 @@ function handleFilePreview(e) {
     preview.appendChild(item);
   });
 
-  // Sync input changes into pendingFiles
   preview.querySelectorAll('input').forEach((input) => {
     input.addEventListener('input', (ev) => {
       const idx = parseInt(ev.target.dataset.idx, 10);
@@ -232,13 +610,8 @@ function handleFilePreview(e) {
 
 async function handleUpload(e) {
   e.preventDefault();
+  if (!currentUser) { alert('You must be logged in to upload.'); return; }
 
-  if (!currentUser) {
-    alert('You must be logged in to upload.');
-    return;
-  }
-
-  // Collect top-level form values (used as defaults when no per-file override)
   const defaultMeta = {
     title: document.getElementById('upload-title').value.trim(),
     description: document.getElementById('upload-description').value.trim(),
@@ -246,32 +619,22 @@ async function handleUpload(e) {
     material: document.getElementById('upload-material').value.trim(),
     dimensions: document.getElementById('upload-dimensions').value.trim(),
     year: document.getElementById('upload-year').value
-      ? parseInt(document.getElementById('upload-year').value, 10)
-      : null,
+      ? parseInt(document.getElementById('upload-year').value, 10) : null,
     price: document.getElementById('upload-price').value
-      ? parseFloat(document.getElementById('upload-price').value)
-      : null,
+      ? parseFloat(document.getElementById('upload-price').value) : null,
     available: document.getElementById('upload-available').checked,
     prints_type: document.getElementById('upload-prints-type').value,
     print_qty: document.getElementById('upload-print-qty').value
-      ? parseInt(document.getElementById('upload-print-qty').value, 10)
-      : null,
+      ? parseInt(document.getElementById('upload-print-qty').value, 10) : null,
     print_size: document.getElementById('upload-print-size').value.trim(),
     print_price: document.getElementById('upload-print-price').value
-      ? parseFloat(document.getElementById('upload-print-price').value)
-      : null,
-    seo_keywords: document
-      .getElementById('upload-seo-keywords')
-      .value.split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
+      ? parseFloat(document.getElementById('upload-print-price').value) : null,
+    seo_keywords: document.getElementById('upload-seo-keywords').value
+      .split(',').map((s) => s.trim()).filter(Boolean),
     status: document.getElementById('upload-status').value,
   };
 
-  if (!pendingFiles.length) {
-    alert('Please select at least one image.');
-    return;
-  }
+  if (!pendingFiles.length) { alert('Please select at least one image.'); return; }
 
   const btn = document.getElementById('upload-btn');
   const progressWrap = document.getElementById('upload-progress');
@@ -280,7 +643,6 @@ async function handleUpload(e) {
 
   btn.disabled = true;
   progressWrap.hidden = false;
-
   let completed = 0;
 
   for (const { file, meta = {} } of pendingFiles) {
@@ -290,9 +652,7 @@ async function handleUpload(e) {
       btn.disabled = false;
       return;
     }
-
     progressText.textContent = `Uploading ${artworkTitle}… (${completed + 1}/${pendingFiles.length})`;
-
     try {
       await uploadArtwork(file, { ...defaultMeta, ...meta, title: artworkTitle });
     } catch (err) {
@@ -300,7 +660,6 @@ async function handleUpload(e) {
       btn.disabled = false;
       return;
     }
-
     completed++;
     progressBar.style.width = `${Math.round((completed / pendingFiles.length) * 100)}%`;
   }
@@ -308,55 +667,37 @@ async function handleUpload(e) {
   progressText.textContent = `Done! ${completed} artwork(s) uploaded.`;
   btn.disabled = false;
 
-  // Reset form
   document.getElementById('upload-form').reset();
   document.getElementById('upload-preview').innerHTML = '';
   pendingFiles = [];
 
-  setTimeout(() => {
-    progressWrap.hidden = true;
-    progressBar.style.width = '0%';
-  }, 3000);
-
+  setTimeout(() => { progressWrap.hidden = true; progressBar.style.width = '0%'; }, 3000);
   loadArtworks();
 }
 
 async function uploadArtwork(file, meta) {
-  // 1. Process images client-side (resize, EXIF strip, WebP/JPEG encode)
   const [imageResult, thumbResult] = await Promise.all([
     processImage(file),
     generateThumbnail(file),
   ]);
 
-  // 2. Build storage paths
   const uid = currentUser.id;
   const uuid = crypto.randomUUID();
   const imagePath = `${uid}/${uuid}/image.${imageResult.ext}`;
   const thumbPath = `${uid}/${uuid}/thumb.${thumbResult.ext}`;
 
-  // 3. Upload to Supabase Storage
   const [imgUpload, thumbUpload] = await Promise.all([
-    supabase.storage
-      .from('artworks')
-      .upload(imagePath, imageResult.blob, {
-        contentType: imageResult.mimeType,
-        cacheControl: '31536000',
-        upsert: false,
-      }),
-    supabase.storage
-      .from('artworks')
-      .upload(thumbPath, thumbResult.blob, {
-        contentType: thumbResult.mimeType,
-        cacheControl: '31536000',
-        upsert: false,
-      }),
+    supabase.storage.from('artworks').upload(imagePath, imageResult.blob, {
+      contentType: imageResult.mimeType, cacheControl: '31536000', upsert: false,
+    }),
+    supabase.storage.from('artworks').upload(thumbPath, thumbResult.blob, {
+      contentType: thumbResult.mimeType, cacheControl: '31536000', upsert: false,
+    }),
   ]);
-
   if (imgUpload.error) throw imgUpload.error;
   if (thumbUpload.error) throw thumbUpload.error;
 
-  // 4. Insert artwork record
-  const record = {
+  const { error } = await supabase.from('artworks').insert({
     title: meta.title,
     description: meta.description || null,
     medium: meta.medium || null,
@@ -374,108 +715,9 @@ async function uploadArtwork(file, meta) {
     image_path: imagePath,
     thumb_path: thumbPath,
     created_by: currentUser.id,
-  };
-
-  const { error } = await supabase.from('artworks').insert(record);
+  });
   if (error) throw error;
 }
-
-// ─── Edit Modal ───────────────────────────────────────────────────────────────
-async function openEditModal(id) {
-  const { data: art, error } = await supabase
-    .from('artworks')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error || !art) {
-    alert('Failed to load artwork data.');
-    return;
-  }
-
-  const modal = document.getElementById('edit-modal');
-  const form = document.getElementById('edit-form');
-
-  // Populate fields
-  setVal(form, 'edit-id', art.id);
-  setVal(form, 'edit-title', art.title);
-  setVal(form, 'edit-description', art.description ?? '');
-  setVal(form, 'edit-medium', art.medium ?? '');
-  setVal(form, 'edit-material', art.material ?? '');
-  setVal(form, 'edit-dimensions', art.dimensions ?? '');
-  setVal(form, 'edit-year', art.year ?? '');
-  setVal(form, 'edit-price', art.price ?? '');
-  form.querySelector('#edit-available').checked = art.available ?? true;
-  setVal(form, 'edit-prints-type', art.prints_type ?? 'none');
-  setVal(form, 'edit-print-qty', art.print_qty ?? '');
-  setVal(form, 'edit-print-size', art.print_size ?? '');
-  setVal(form, 'edit-print-price', art.print_price ?? '');
-  setVal(form, 'edit-seo-keywords', (art.seo_keywords ?? []).join(', '));
-  setVal(form, 'edit-status', art.status);
-
-  modal.hidden = false;
-}
-
-function setVal(form, id, value) {
-  const el = form.querySelector(`#${id}`) ?? document.getElementById(id);
-  if (el) el.value = value ?? '';
-}
-
-document.getElementById('edit-modal-close')?.addEventListener('click', () => {
-  document.getElementById('edit-modal').hidden = true;
-});
-
-document.getElementById('edit-form')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const id = form.querySelector('#edit-id').value;
-
-  const updates = {
-    title: form.querySelector('#edit-title').value.trim(),
-    description: form.querySelector('#edit-description').value.trim() || null,
-    medium: form.querySelector('#edit-medium').value.trim() || null,
-    material: form.querySelector('#edit-material').value.trim() || null,
-    dimensions: form.querySelector('#edit-dimensions').value.trim() || null,
-    year: form.querySelector('#edit-year').value
-      ? parseInt(form.querySelector('#edit-year').value, 10)
-      : null,
-    price: form.querySelector('#edit-price').value
-      ? parseFloat(form.querySelector('#edit-price').value)
-      : null,
-    available: form.querySelector('#edit-available').checked,
-    prints_type: form.querySelector('#edit-prints-type').value,
-    print_qty: form.querySelector('#edit-print-qty').value
-      ? parseInt(form.querySelector('#edit-print-qty').value, 10)
-      : null,
-    print_size: form.querySelector('#edit-print-size').value.trim() || null,
-    print_price: form.querySelector('#edit-print-price').value
-      ? parseFloat(form.querySelector('#edit-print-price').value)
-      : null,
-    seo_keywords: form
-      .querySelector('#edit-seo-keywords')
-      .value.split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-    status: form.querySelector('#edit-status').value,
-  };
-
-  const { error } = await supabase.from('artworks').update(updates).eq('id', id);
-
-  if (error) {
-    alert(`Failed to save: ${error.message}`);
-    return;
-  }
-
-  document.getElementById('edit-modal').hidden = true;
-  loadArtworks();
-});
-
-// Close modal on backdrop click
-document.getElementById('edit-modal')?.addEventListener('click', (e) => {
-  if (e.target === document.getElementById('edit-modal')) {
-    document.getElementById('edit-modal').hidden = true;
-  }
-});
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
