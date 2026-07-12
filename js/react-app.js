@@ -260,16 +260,104 @@ function LoginModal({ onClose, onSuccess }) {
   `;
 }
 
+/**
+ * Classifies a gallery fetch error into a structured object so the UI can
+ * show a clean message while still surfacing diagnostic details.
+ */
+function classifyGalleryError(err) {
+  const timestamp = new Date().toISOString();
+  const message = err?.message || String(err) || 'Unknown error';
+
+  // Network-level failures: server unreachable, Cloudflare error, DNS failure, etc.
+  const isNetworkError =
+    err instanceof TypeError &&
+    /NetworkError|Failed to fetch|Load failed|network request failed/i.test(message);
+
+  if (isNetworkError) {
+    return {
+      kind: 'network',
+      userMessage: 'Gallery temporarily unavailable',
+      hint: 'The database server could not be reached — it may still be starting up. Try again in a moment.',
+      detail: message,
+      httpStatus: null,
+      timestamp,
+    };
+  }
+
+  // Supabase API / HTTP errors carry a status code.
+  const httpStatus = err?.status ?? err?.statusCode ?? null;
+  if (httpStatus) {
+    return {
+      kind: 'api',
+      userMessage: 'Failed to load gallery',
+      hint: `The server responded with an error (HTTP\u00a0${httpStatus}).`,
+      detail: message,
+      httpStatus,
+      timestamp,
+    };
+  }
+
+  return {
+    kind: 'unknown',
+    userMessage: 'Failed to load gallery',
+    hint: 'An unexpected error occurred.',
+    detail: message,
+    httpStatus: null,
+    timestamp,
+  };
+}
+
+function GalleryErrorState({ error, onRetry }) {
+  const [showDetails, setShowDetails] = useState(false);
+
+  const kindLabel =
+    error.kind === 'network' ? 'Network error'
+    : error.kind === 'api' ? 'API error'
+    : 'Unknown error';
+
+  return html`
+    <div className="gallery-error-state" role="alert" aria-live="polite">
+      <p className="gallery-error-title">
+        <span className="gallery-error-icon" aria-hidden="true">⚠</span>
+        ${error.userMessage}
+      </p>
+      <p className="gallery-error-hint">${error.hint}</p>
+      <button className="btn btn-secondary gallery-error-retry" onClick=${onRetry}>
+        Try again
+      </button>
+      <button
+        className="gallery-error-details-toggle"
+        onClick=${() => setShowDetails((prev) => !prev)}
+        aria-expanded=${String(showDetails)}
+      >
+        ${showDetails ? '▲' : '▼'} Diagnostic details
+      </button>
+      ${showDetails
+        ? html`
+            <dl className="gallery-error-details">
+              <dt>Type</dt><dd>${kindLabel}</dd>
+              ${error.httpStatus
+                ? html`<dt>HTTP status</dt><dd>${error.httpStatus}</dd>`
+                : null}
+              <dt>Message</dt><dd>${error.detail}</dd>
+              <dt>Time</dt><dd>${error.timestamp}</dd>
+            </dl>
+          `
+        : null}
+    </div>
+  `;
+}
+
 function GalleryPage({ isAdmin, user }) {
   const [artworks, setArtworks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [active, setActive] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
 
   async function loadArtworks() {
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
       const sb = getSupabaseClient();
@@ -294,7 +382,9 @@ function GalleryPage({ isAdmin, user }) {
 
       setArtworks(data ?? []);
     } catch (err) {
-      setError(err?.message || 'Unexpected error while loading artworks');
+      const classified = classifyGalleryError(err);
+      console.error('[Gallery] Failed to load artworks:', classified);
+      setError(classified);
     } finally {
       setLoading(false);
     }
@@ -314,7 +404,7 @@ function GalleryPage({ isAdmin, user }) {
       </div>
 
       ${loading ? html`<p className="page-loading">Loading…</p>` : null}
-      ${error ? html`<p className="error-text">Failed to load gallery: ${error}</p>` : null}
+      ${error ? html`<${GalleryErrorState} error=${error} onRetry=${loadArtworks} />` : null}
       ${!loading && !error && artworks.length === 0
         ? html`
             <div className="gallery-empty-state" role="status" aria-live="polite">
