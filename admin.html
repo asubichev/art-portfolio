@@ -174,53 +174,111 @@
           <h2 class="panel-title" style="margin: 0;">All artworks</h2>
           <button id="refresh-btn" class="btn btn-secondary btn-sm">Refresh</button>
         </div>
-
-        <!-- Bulk action toolbar (visible when ≥1 card selected) -->
-        <div id="bulk-toolbar" class="bulk-toolbar" hidden>
-          <span class="bulk-count">0 selected</span>
-          <div class="bulk-actions">
-            <select id="bulk-status-select" class="select select--sm">
-              <option value="published">Set Published</option>
-              <option value="draft">Set Draft</option>
-              <option value="archived">Set Archived</option>
-            </select>
-            <button id="bulk-status-apply" class="btn btn-sm btn-secondary">Apply</button>
-            <button id="bulk-delete-btn" class="btn btn-sm btn-delete">Delete selected</button>
-          </div>
-        </div>
-
-        <div id="artworks-list" class="artworks-grid"></div>
+        <div id="artworks-list"></div>
       </div>
     </div>
 
-    <!-- ── Bulk Delete Confirmation Modal ──────────────────────────────── -->
-    <div id="bulk-delete-modal" hidden role="dialog" aria-modal="true" aria-labelledby="bulk-delete-modal-title">
+    <!-- ── Edit Modal ─────────────────────────────────────────────────────── -->
+    <div id="edit-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
       <div class="modal-box">
         <div class="modal-header">
-          <h3 id="bulk-delete-modal-title" class="modal-title">Confirm bulk delete</h3>
+          <h3 id="edit-modal-title" class="modal-title">Edit artwork</h3>
+          <button id="edit-modal-close" class="modal-close" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-body">
-          <p style="margin-bottom: 12px;">
-            You are about to permanently delete
-            <strong class="bulk-delete-count">0</strong> artwork(s).
-            This cannot be undone, and all associated images will be removed.
-          </p>
-          <p style="margin-bottom: 8px;">
-            Type <strong class="bulk-delete-word" style="font-family: monospace; font-size: 1.05em; letter-spacing: 0.05em;"></strong> to confirm:
-          </p>
-          <input
-            type="text"
-            id="bulk-delete-word-input"
-            class="input"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="Type the word above…"
-          />
-        </div>
-        <div class="modal-footer">
-          <button type="button" id="bulk-delete-cancel-btn" class="btn btn-secondary">Cancel</button>
-          <button type="button" id="bulk-delete-confirm-btn" class="btn btn-delete" disabled>Delete permanently</button>
-        </div>
+        <form id="edit-form" novalidate>
+          <input type="hidden" id="edit-id" />
+          <div class="modal-body">
+
+            <div class="form-group">
+              <label class="form-label" for="edit-title">Title *</label>
+              <input id="edit-title" type="text" class="input" required />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-description">Description</label>
+              <textarea id="edit-description" class="textarea" rows="3"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-medium">Medium</label>
+                <input id="edit-medium" type="text" class="input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-material">Material</label>
+                <input id="edit-material" type="text" class="input" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-dimensions">Dimensions</label>
+                <input id="edit-dimensions" type="text" class="input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-year">Year</label>
+                <input id="edit-year" type="number" class="input" min="1800" max="2100" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-price">Price (USD)</label>
+                <input id="edit-price" type="number" class="input" min="0" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-status">Status</label>
+                <select id="edit-status" class="select">
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-check">
+              <input id="edit-available" type="checkbox" />
+              <label for="edit-available" class="form-label" style="margin: 0;">Available for sale</label>
+            </div>
+
+            <hr class="divider" />
+            <p class="form-label">Prints</p>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label class="form-label" for="edit-prints-type">Type</label>
+                <select id="edit-prints-type" class="select">
+                  <option value="none">None</option>
+                  <option value="open">Open edition</option>
+                  <option value="limited">Limited edition</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-print-qty">Qty</label>
+                <input id="edit-print-qty" type="number" class="input" min="1" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-print-price">Print price</label>
+                <input id="edit-print-price" type="number" class="input" min="0" step="0.01" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-print-size">Print size</label>
+              <input id="edit-print-size" type="text" class="input" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-seo-keywords">SEO keywords <small>(comma-separated)</small></label>
+              <input id="edit-seo-keywords" type="text" class="input" />
+            </div>
+
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="edit-cancel-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save changes</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -239,6 +297,11 @@
 
         // Refresh button
         document.getElementById('refresh-btn')?.addEventListener('click', loadArtworks);
+
+        // Edit cancel button
+        document.getElementById('edit-cancel-btn')?.addEventListener('click', () => {
+          document.getElementById('edit-modal').hidden = true;
+        });
       });
     </script>
   </body>
